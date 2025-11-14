@@ -1,6 +1,6 @@
 import os
-import feedparser # A simple library for RSS feeds
-from transformers import pipeline # Hugging Face model
+import feedparser
+from transformers import pipeline
 from dotenv import load_dotenv
 from supabase import create_client, Client
 import datetime
@@ -23,26 +23,22 @@ except Exception as e:
     print(f"Error connecting to Supabase: {e}")
     exit()
 
-# Initialize the Hugging Face model (as mentioned in your plan)
-# This will download the model the first time it's run
 print("Loading sentiment model (this may take a moment)...")
 try:
     sentiment_pipeline = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
     print("Sentiment model loaded successfully.")
 except Exception as e:
     print(f"Error loading sentiment model: {e}")
-    print("Please ensure you have an internet connection and 'transformers' and 'torch' are installed.")
     exit()
 
 # --- 2. MAIN EXECUTION ---
 def run_sentiment_pipeline():
-    # --- STAGE 1: Get all players from DB ---
     print("Fetching player list from Supabase...")
     player_map = {} # Maps {full_name: supabase_id}
     try:
         response = supabase.table('players').select('id, full_name').execute()
         if not response.data:
-            print("No players found in database. Exiting sentiment scraper.")
+            print("No players found. Exiting sentiment scraper.")
             return
         for player in response.data:
             player_map[player['full_name']] = player['id']
@@ -51,9 +47,7 @@ def run_sentiment_pipeline():
         print(f"Error fetching players: {e}")
         return
 
-    # --- STAGE 2: Scrape News Feed ---
     print("Fetching ESPN NBA RSS feed...")
-    # This is a much more stable way to get headlines than scraping a full page
     feed_url = "https://www.espn.com/espn/rss/nba/news"
     feed = feedparser.parse(feed_url)
     
@@ -63,33 +57,27 @@ def run_sentiment_pipeline():
         
     print(f"Found {len(feed.entries)} articles.")
     
-    # --- STAGE 3: Analyze Sentiment and Insert ---
     sentiment_to_insert = []
     today = datetime.date.today().isoformat()
-    
-    # Use a set to avoid saving the same (player, headline) pair twice
     processed_pairs = set()
 
     for entry in feed.entries:
         headline = entry.title
+        article_guid = entry.id 
         
-        # Check if any player name is in the headline
         for player_name, player_id in player_map.items():
-            # Check for the full name as a whole word to avoid partial matches
             if f" {player_name} " in f" {headline} ":
                 
-                if (player_id, headline) in processed_pairs:
-                    continue # Already processed this
-                    
+                if (player_id, article_guid) in processed_pairs:
+                    continue 
+
                 print(f"  Found match: '{player_name}' in headline: '{headline}'")
                 
-                # Run NLP sentiment analysis
                 try:
                     result = sentiment_pipeline(headline)[0]
                     label = result['label']
                     score = result['score']
                     
-                    # Convert score to -1.0 to +1.0 (as per your plan)
                     if label == 'NEGATIVE':
                         sentiment_score = -score
                     else:
@@ -99,23 +87,30 @@ def run_sentiment_pipeline():
                         "player_id": player_id,
                         "article_date": today,
                         "headline_text": headline,
-                        "sentiment_score": sentiment_score
+                        "sentiment_score": sentiment_score,
+                        "article_guid": article_guid
                     }
                     sentiment_to_insert.append(sentiment_obj)
-                    processed_pairs.add((player_id, headline))
+                    processed_pairs.add((player_id, article_guid))
                     
                 except Exception as e:
                     print(f"    Error analyzing sentiment for headline: {e}")
 
     if sentiment_to_insert:
-        print(f"\nInserting {len(sentiment_to_insert)} sentiment records...")
+        print(f"\nUpserting {len(sentiment_to_insert)} sentiment records...")
         try:
-            response = supabase.table('daily_player_sentiment').insert(sentiment_to_insert).execute()
+            # --- ⭐️ THIS IS THE FIX ⭐️ ---
+            # Use the COLUMN NAMES, not the constraint name
+            response = supabase.table('daily_player_sentiment').upsert(
+                sentiment_to_insert, 
+                on_conflict='player_id, article_guid'
+            ).execute()
+            
             if response.data:
-                print(f"Successfully inserted {len(response.data)} sentiment records.")
+                print(f"Successfully upserted {len(response.data)} sentiment records.")
             print("--- SENTIMENT SCRAPE COMPLETE ---")
         except Exception as e:
-            print(f"Error inserting sentiment: {e}")
+            print(f"Error upserting sentiment: {e}")
     else:
         print("\nNo new player sentiment to insert.")
 

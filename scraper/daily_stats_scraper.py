@@ -92,13 +92,15 @@ def get_stats_from_game_id(game_id: str, game_date: datetime.date):
                 
             player_name = f"{row['firstName']} {row['familyName']}"
             team_name = row['teamName']
-            
-            # --- ⭐️ 1. GET THE POSITION ---
-            position = row['position'] or "N/A" # Use "N/A" if position is blank
+            position = row['position'] or "N/A"
             
             stat_line = {
+                # These keys are temporary for stage 4
                 "player_name": player_name,
                 "team_name": team_name,
+                "position": position,
+                
+                # These keys match your DB
                 "game_date": game_date.isoformat(),
                 "points": int(row['points'] or 0),
                 "rebounds": int(row['reboundsTotal'] or 0),
@@ -109,8 +111,6 @@ def get_stats_from_game_id(game_id: str, game_date: datetime.date):
             }
             
             player_stats_list.append(stat_line)
-            
-            # --- ⭐️ 2. PASS THE POSITION UP TO THE NEXT STAGE ---
             player_names_found.add((player_name, team_name, position))
             
         print(f"    Processed {len(player_stats_list)} players for game {game_id}.")
@@ -123,7 +123,7 @@ def get_stats_from_game_id(game_id: str, game_date: datetime.date):
 # --- 3. MAIN EXECUTION ---
 def run_stats_pipeline():
     print("\n--- STAGE 1: Fetching Existing Players ---")
-    player_map = {} 
+    player_map = {} # Maps {full_name: supabase_id}
     try:
         response = supabase.table('players').select('id, full_name').execute()
         if response.data:
@@ -155,39 +155,47 @@ def run_stats_pipeline():
     
     print(f"\nTotal stat lines scraped: {len(all_scraped_stats)}")
 
-    print("\n--- STAGE 4: Inserting New Players ---")
+    print("\n--- STAGE 4: Upserting New Players ---")
     new_players_to_insert = []
     
-    # --- ⭐️ 3. UNPACK THE POSITION ---
     for player_name, team_name, position in all_scraped_players:
         if player_name not in player_map:
             new_players_to_insert.append({
                 "full_name": player_name, 
                 "team_name": team_name,
-                "position": position # <-- Add the position here
+                "position": position
             }) 
             
     if new_players_to_insert:
-        print(f"Inserting {len(new_players_to_insert)} new players...")
+        print(f"Upserting {len(new_players_to_insert)} new players...")
         try:
-            response = supabase.table('players').insert(new_players_to_insert).execute()
+            # Use upsert here just in case (though insert would also work)
+            response = supabase.table('players').upsert(
+                new_players_to_insert, 
+                on_conflict='full_name' # Assuming full_name is unique
+            ).execute()
+            
             if response.data:
                 for player_data in response.data:
                     player_map[player_data['full_name']] = player_data['id']
-                print("New players inserted and local map updated.")
+                print("New players upserted and local map updated.")
             else:
-                print("Error: Inserted new players but received no data back.")
+                print("Error: Upserted new players but received no data back.")
         except Exception as e:
-            print(f"Error inserting new players: {e}")
+            print(f"Error upserting new players: {e}")
+            # Note: We should add a unique constraint on 'full_name' in Supabase
     else:
         print("No new players to insert.")
 
-    print("\n--- STAGE 5: Inserting Daily Stats ---")
+    print("\n--- STAGE 5: Upserting Daily Stats ---")
     final_stats_to_insert = []
     for stat_line in all_scraped_stats:
         player_name = stat_line.pop('player_name')
-        stat_line.pop('team_name')
         player_id = player_map.get(player_name)
+        
+        # Pop off the temp keys
+        stat_line.pop('team_name')
+        stat_line.pop('position')
         
         if player_id:
             stat_line['player_id'] = player_id
@@ -196,14 +204,19 @@ def run_stats_pipeline():
             print(f"Could not find ID for {player_name}. Skipping stat line.")
             
     if final_stats_to_insert:
-        print(f"\nInserting {len(final_stats_to_insert)} stat lines into 'daily_player_stats'...")
+        print(f"\nUpserting {len(final_stats_to_insert)} stat lines into 'daily_player_stats'...")
         try:
-            response = supabase.table('daily_player_stats').insert(final_stats_to_insert).execute()
+            # Use upsert with the unique constraint you created
+            response = supabase.table('daily_player_stats').upsert(
+                final_stats_to_insert,
+                on_conflict='player_id, game_date'
+            ).execute()
+            
             if response.data:
-                 print(f"Successfully inserted {len(response.data)} stat lines.")
+                 print(f"Successfully upserted {len(response.data)} stat lines.")
             print("--- STATS SCRAPE COMPLETE ---")
         except Exception as e:
-            print(f"Error inserting stats: {e}")
+            print(f"Error upserting stats: {e}")
     else:
         print("\nNo new stats to insert.")
 

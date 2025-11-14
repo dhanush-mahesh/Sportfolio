@@ -101,12 +101,26 @@ def get_player_news(player_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# GET /market-movers (This is a TO-DO for your value_index script)
+# GET /market-movers
 @app.get("/market-movers")
 def get_market_movers():
     """
-    Shows top 5 risers/fallers.
-    This requires the player_value_index to be populated.
-    This is a placeholder for now.
+    Calls the database function to get the top 5 risers and fallers.
     """
-    return {"risers": [], "fallers": []}
+    try:
+        # This calls the SQL function you just created
+        response = supabase.rpc('get_market_movers').execute()
+        
+        all_movers = response.data
+        
+        # Sort the data (though SQL already did it)
+        all_movers.sort(key=lambda x: x['value_change'], reverse=True)
+        
+        risers = all_movers[:5]  # Top 5
+        fallers = all_movers[-5:] # Bottom 5
+        fallers.reverse() # Show biggest faller first
+        
+        return {"risers": risers, "fallers": fallers}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

@@ -16,4 +16,10 @@ __pycache__/
 
 # Ignore Mac system files
 .DS_Store
-EOT 
+EOT # React/Vite client
+client/node_modules/
+client/dist/
+client/.eslintcache
+# Debug scripts
+scraper/debug_api.py
+scraper/debug_columns.py

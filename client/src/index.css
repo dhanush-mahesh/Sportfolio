@@ -1,0 +1,20 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+    /*
+      This creates a very large, very dark gray "glow"
+      from the top center of the page, fading to pure black.
+    */
+    background-color: #000000;
+    background-image: radial-gradient(
+      ellipse 80% 50% at 50% -20%,
+      rgba(120, 119, 198, 0.15),
+      rgba(255, 255, 255, 0)
+    );
+    color: #f5f5f5;
+    font-family: 'Inter', sans-serif;
+  }
