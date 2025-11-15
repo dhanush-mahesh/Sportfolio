@@ -66,9 +66,9 @@ function PlayerPage({ playerId, onBackClick, apiUrl }) {
       {/* ... (Header is unchanged) ... */}
       <div className="flex justify-between items-center mb-6">
         <img 
-          src="/logo.png" 
+          src="/SportfolioLogo.png" 
           alt="Sportfolio Logo" 
-          className="w-12 h-12 cursor-pointer" 
+          className="w-40 h-30 cursor-pointer" 
           onClick={onBackClick}
         />
         <button

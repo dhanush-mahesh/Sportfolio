@@ -24,8 +24,8 @@ function PlayerList({ allPlayers, featuredPlayers, loading, onPlayerClick, apiUr
   return (
     <div className="flex flex-col"> 
       
-      <div className="text-center max-w-2xl mx-auto mb-12 mt-8">
-        <img src="/logo.png" alt="Sportfolio Logo" className="w-24 h-24 mx-auto mb-6 cursor-pointer"/>
+      <div className="text-center max-w-2xl mx-auto mb-12 mt-0">
+        <img src="/SportfolioLogo.png" alt="Sportfolio Logo" className="w-60 h-50 mx-auto mb-2 cursor-pointer"/>
         <h1 className="text-6xl font-extrabold tracking-tighter text-transparent 
                        bg-clip-text bg-gradient-to-r from-purple-400 via-blue-500 to-green-400 
                        bg-200% animate-text-shimmer mb-4">
