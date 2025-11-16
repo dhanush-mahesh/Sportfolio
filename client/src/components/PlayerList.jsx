@@ -6,6 +6,7 @@ function PlayerList({ allPlayers, featuredPlayers, loading, onPlayerClick, apiUr
   const [searchQuery, setSearchQuery] = useState("")
 
   const filteredPlayers = useMemo(() => {
+    if (!allPlayers) return [];
     if (searchQuery === "") {
       return allPlayers
     }
@@ -18,14 +19,13 @@ function PlayerList({ allPlayers, featuredPlayers, loading, onPlayerClick, apiUr
     ? featuredPlayers
     : filteredPlayers
     
-  // This logic is already correct and will now use the new limit of 3
-  const atCompareLimit = compareIds.size >= compareLimit
+  const atCompareLimit = compareIds.length >= compareLimit
 
   return (
     <div className="flex flex-col"> 
       
-      <div className="text-center max-w-2xl mx-auto mb-12 mt-0">
-        <img src="/SportfolioLogo.png" alt="Sportfolio Logo" className="w-60 h-50 mx-auto mb-2 cursor-pointer"/>
+      <div className="text-center max-w-2xl mx-auto mb-12 mt-2">
+        <img src="/SportfolioLogo.png" alt="Sportfolio Logo" className="w-60 h-50 mx-auto mb-4 cursor-pointer"/>
         <h1 className="text-6xl font-extrabold tracking-tighter text-transparent 
                        bg-clip-text bg-gradient-to-r from-purple-400 via-blue-500 to-green-400 
                        bg-200% animate-text-shimmer mb-4">
@@ -61,19 +61,24 @@ function PlayerList({ allPlayers, featuredPlayers, loading, onPlayerClick, apiUr
 
       {!loading && (
         <div className="w-full">
-          {/* --- ⭐️ UPDATED INSTRUCTIONS TEXT --- */}
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-semibold text-neutral-300 pl-1">
               {searchQuery ? `Search Results (${filteredPlayers.length})` : "Top 9 Players"}
             </h2>
+            
+            {/* --- ⭐️ THIS IS THE FIX ⭐️ --- */}
             <p className="text-sm text-neutral-500">
-              Select 2 players to compare using the + icon ({compareIds.size}/{compareLimit})
+              Select 2-{compareLimit} players to compare{" "}
+              <span className="font-semibold text-neutral-200">
+                ({compareIds.length}/{compareLimit})
+              </span>
             </p>
+
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {displayPlayers.map(player => {
-              const isComparing = compareIds.has(player.player_id || player.id)
+            {displayPlayers && displayPlayers.map(player => {
+              const isComparing = compareIds.includes(player.player_id || player.id)
               
               return (
                 <div
@@ -99,7 +104,6 @@ function PlayerList({ allPlayers, featuredPlayers, loading, onPlayerClick, apiUr
                     <p className="text-neutral-400 font-medium">{player.team_name} &middot; {player.position || 'N/A'}</p>
                   </div>
                   
-                  {/* This button logic is already correct and will use the new limit */}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -119,7 +123,7 @@ function PlayerList({ allPlayers, featuredPlayers, loading, onPlayerClick, apiUr
             })}
           </div>
 
-          {searchQuery === "" && (
+          {searchQuery === "" && allPlayers && (
             <p className="text-center text-neutral-500 mt-12">
               Start typing to search {allPlayers.length} players...
             </p>

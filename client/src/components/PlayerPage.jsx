@@ -3,7 +3,6 @@ import axios from 'axios'
 import { ArrowLeft, Loader2, Newspaper, TrendingUp, BarChartHorizontal, CheckSquare } from 'lucide-react'
 import PlayerChart from './Chart'
 import StatCard from './StatCard'
-// --- ⭐️ REMOVED UpcomingSchedule import ---
 
 function PlayerPage({ playerId, onBackClick, apiUrl }) {
   const [player, setPlayer] = useState(null)
@@ -19,8 +18,6 @@ function PlayerPage({ playerId, onBackClick, apiUrl }) {
     async function fetchPlayerData() {
       setLoading(true)
       try {
-        // --- ⭐️ THIS IS THE FIX ⭐️ ---
-        // The list of variables now matches the list of API calls.
         const [infoRes, statsRes, newsRes, valueRes, seasonStatsRes] = await Promise.all([
           axios.get(`${apiUrl}/player/${playerId}`),
           axios.get(`${apiUrl}/player/${playerId}/stats`),
@@ -59,11 +56,34 @@ function PlayerPage({ playerId, onBackClick, apiUrl }) {
     return <p>Player not found.</p>
   }
 
-  const latestValue = valueHistory.length > 0 ? valueHistory[valueHistory.length - 1]?.value_score : null;
+  // --- ⭐️ 1. NEW LOGIC TO CALCULATE ALL 3 VALUES ---
+  let latestValue = null;
+  let previousValue = null; // We will pass this to the UI
+  let valueChange = null;
+  let valueChangeColor = 'text-neutral-500';
+  let valueChangeSymbol = ''; // Use '+' or '-'
+
+  if (valueHistory.length > 0) {
+    latestValue = valueHistory[valueHistory.length - 1].value_score;
+  }
+  
+  if (valueHistory.length > 1) {
+    previousValue = valueHistory[valueHistory.length - 2].value_score; // Get previous score
+    valueChange = latestValue - previousValue;
+    
+    if (valueChange > 0) {
+      valueChangeColor = 'text-green-400';
+      valueChangeSymbol = '+'; // Use a plus sign
+    } else if (valueChange < 0) {
+      valueChangeColor = 'text-red-400';
+      valueChangeSymbol = '-'; // Use a minus sign
+    }
+    // if 0, it will just be 'text-neutral-500' and no symbol
+  }
+  // --- ⭐️ END OF NEW LOGIC ---
 
   return (
     <div>
-      {/* ... (Header is unchanged) ... */}
       <div className="flex justify-between items-center mb-6">
         <img 
           src="/SportfolioLogo.png" 
@@ -71,6 +91,7 @@ function PlayerPage({ playerId, onBackClick, apiUrl }) {
           className="w-40 h-30 cursor-pointer" 
           onClick={onBackClick}
         />
+        
         <button
           onClick={onBackClick}
           className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors"
@@ -79,23 +100,49 @@ function PlayerPage({ playerId, onBackClick, apiUrl }) {
           Back to Player List
         </button>
       </div>
+
+      {/* Player Header */}
       <div className="flex justify-between items-center mb-8">
          <div>
           <h1 className="text-5xl font-bold">{player.full_name}</h1>
           <p className="text-2xl text-neutral-400">{player.team_name} &middot; {player.position || 'N/A'}</p>
         </div>
+
+        {/* --- ⭐️ 2. UPDATED JSX FOR CURRENT VALUE --- */}
         <div className="text-right">
           <p className="text-sm text-neutral-500">Current Value</p>
-          <p className="text-5xl font-bold text-green-400">
+          
+          {/* The main current value */}
+          <p className="text-5xl font-bold">
             {latestValue ? latestValue.toFixed(2) : 'N/A'}
           </p>
+          
+          {/* The new sub-header showing previous and change */}
+          {valueChange !== null ? (
+            <div className="flex items-baseline justify-end gap-2">
+              <span className={`text-lg font-semibold ${valueChangeColor}`}>
+                {valueChangeSymbol}{Math.abs(valueChange).toFixed(2)}
+              </span>
+              <span className="text-md text-neutral-500">
+                (from {previousValue.toFixed(2)})
+              </span>
+            </div>
+          ) : (
+            // Fallback for when there's only 1 day of data
+            <span className="text-md text-neutral-500">No change data yet</span>
+          )}
         </div>
+        {/* --- ⭐️ END OF UPDATED JSX --- */}
+        
       </div>
 
-
+      {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {/* Left Column: Chart & Stats */}
         <div className="lg:col-span-2 space-y-6">
           
+          {/* Chart */}
           <div className="bg-highlight-dark border border-highlight-light rounded-lg p-6">
              <h2 className="flex items-center gap-2 text-2xl font-semibold mb-4">
               <TrendingUp size={24} />
@@ -105,7 +152,8 @@ function PlayerPage({ playerId, onBackClick, apiUrl }) {
               <PlayerChart valueHistory={valueHistory} />
             </div>
           </div>
-          
+
+          {/* Recent Game Stats */}
           <div className="bg-highlight-dark border border-highlight-light rounded-lg p-6">
             <h2 className="flex items-center gap-2 text-2xl font-semibold mb-4">
               <BarChartHorizontal size={24} />
@@ -125,6 +173,7 @@ function PlayerPage({ playerId, onBackClick, apiUrl }) {
             )}
           </div>
           
+          {/* Season Stats Table */}
           <div className="bg-highlight-dark border border-highlight-light rounded-lg p-6">
             <h2 className="flex items-center gap-2 text-2xl font-semibold mb-4">
               <CheckSquare size={24} />
@@ -168,6 +217,7 @@ function PlayerPage({ playerId, onBackClick, apiUrl }) {
           
         </div>
 
+        {/* Right Column: Market Buzz */}
         <div className="lg:col-span-1 space-y-6">
            <div className="bg-highlight-dark border border-highlight-light rounded-lg p-6">
             <h2 className="flex items-center gap-2 text-2xl font-semibold mb-4">
@@ -189,8 +239,6 @@ function PlayerPage({ playerId, onBackClick, apiUrl }) {
               )}
             </div>
           </div>
-          
-          {/* --- ⭐️ REMOVED BROKEN SCHEDULE COMPONENT --- */}
         </div>
       </div>
     </div>

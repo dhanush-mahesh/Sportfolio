@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
+# --- ⭐️ 1. ADDED IMPORTS FOR THE NEW ENDPOINT ---
 from typing import List
 from pydantic import BaseModel
 
@@ -23,6 +24,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- ⭐️ 2. DEFINE THE REQUEST MODEL FOR THE NEW ENDPOINT ---
 class CompareRequest(BaseModel):
     player_ids: List[str] 
 
@@ -108,8 +110,13 @@ def get_market_movers():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# --- ⭐️ 3. THIS IS THE NEW, WORKING ENDPOINT ---
 @app.post("/players/compare")
 def get_compare_data(request: CompareRequest):
+    """
+    Fetches all data needed for a side-by-side comparison
+    for a list of player_ids.
+    """
     try:
         player_ids = request.player_ids
         
@@ -150,5 +157,3 @@ def get_compare_data(request: CompareRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-# --- ⭐️ REMOVED /standings and /player/{id}/schedule ---

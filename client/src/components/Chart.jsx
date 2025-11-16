@@ -12,7 +12,7 @@ function PlayerChart({ valueHistory }) {
     
   const data = valueHistory.length 
     ? valueHistory.map(d => d.value_score) 
-    : [0];
+    : [50]; // Default to 50 (the middle) if no data
 
   // Make a single point visible (a "dot")
   if (data.length === 1) {
@@ -54,7 +54,10 @@ function PlayerChart({ valueHistory }) {
         },
         ticks: {
           color: '#a3a3a3'
-        }
+        },
+        // --- ⭐️ THIS IS THE FIX (Part 1) ⭐️ ---
+        min: 0,
+        max: 100,
       }
     },
     plugins: {
@@ -73,6 +76,8 @@ function PlayerChart({ valueHistory }) {
     }
   }
 
+  // --- ⭐️ THIS IS THE FIX (Part 2) ⭐️ ---
+  // Corrected the syntax error (was data[=)
   return <Line data={chartData} options={options} />
 }
 

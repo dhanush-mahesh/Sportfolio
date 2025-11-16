@@ -5,7 +5,7 @@ import PlayerPage from './components/PlayerPage'
 import ComparePage from './components/ComparePage'
 
 const API_URL = 'http://127.0.0.1:8000'
-const COMPARE_LIMIT = 2 // <-- ⭐️ 1. CHANGED LIMIT TO 2
+const COMPARE_LIMIT = 3 // We'll keep the 3-player limit logic
 
 function App() {
   const [players, setPlayers] = useState([])
@@ -13,7 +13,8 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [selectedPlayerId, setSelectedPlayerId] = useState(null)
   
-  const [compareIds, setCompareIds] = useState(new Set())
+  // --- ⭐️ 1. CHANGED STATE TO AN ARRAY [] ---
+  const [compareIds, setCompareIds] = useState([]) // Was new Set()
   const [viewingCompare, setViewingCompare] = useState(false)
 
   useEffect(() => {
@@ -34,27 +35,45 @@ function App() {
     fetchInitialData()
   }, [])
 
-  // --- ⭐️ 2. UPDATED COMPARE FUNCTION (now checks limit of 3) ---
+  // --- ⭐️ 2. UPDATED TOGGLE FUNCTION FOR ARRAYS ---
   const handleToggleCompare = (playerId) => {
     setCompareIds(prevIds => {
-      const newIds = new Set(prevIds)
-      
-      if (newIds.has(playerId)) {
-        newIds.delete(playerId)
+      // Check if player is already in the array
+      if (prevIds.includes(playerId)) {
+        // Remove them
+        return prevIds.filter(id => id !== playerId);
       } else {
-        // Only allow adding if we are under the limit
-        if (newIds.size < COMPARE_LIMIT) {
-          newIds.add(playerId)
-        } else {
-          console.log(`Compare limit of ${COMPARE_LIMIT} reached.`)
+        // Add them if we are under the limit
+        if (prevIds.length < COMPARE_LIMIT) {
+          return [...prevIds, playerId];
         }
       }
-      return newIds
+      // If limit is reached, just return the old array
+      return prevIds;
     })
   }
 
+  // --- ⭐️ 3. UPDATED REPLACE FUNCTION FOR ARRAYS ---
+  const handleReplacePlayer = (oldPlayerId, newPlayerId) => {
+    setCompareIds(prevIds => {
+      // Check if new player is already in the list
+      if (prevIds.includes(newPlayerId)) {
+        // Just remove the old one
+        return prevIds.filter(id => id !== oldPlayerId);
+      }
+      
+      // Swap them by mapping over the array, PRESERVING ORDER
+      return prevIds.map(id => {
+        if (id === oldPlayerId) {
+          return newPlayerId; // This is the swap
+        }
+        return id;
+      });
+    });
+  };
+
   const handleClearCompare = () => {
-    setCompareIds(new Set())
+    setCompareIds([]) // Set to empty array
     setViewingCompare(false)
   }
 
@@ -69,10 +88,12 @@ function App() {
           />
         ) : viewingCompare ? (
           <ComparePage 
-            playerIds={Array.from(compareIds)}
+            playerIds={compareIds} // Pass the array directly
             onBackClick={() => setViewingCompare(false)}
             onClear={handleClearCompare}
             apiUrl={API_URL}
+            allPlayers={players}
+            onReplacePlayer={handleReplacePlayer}
           />
         ) : (
           <PlayerList
@@ -81,19 +102,19 @@ function App() {
             loading={loading}
             onPlayerClick={(id) => setSelectedPlayerId(id)}
             apiUrl={API_URL}
-            compareIds={compareIds}
+            compareIds={compareIds} // Pass the array
             onToggleCompare={handleToggleCompare}
-            compareLimit={COMPARE_LIMIT} // <-- ⭐️ 3. Pass the limit of 3
+            compareLimit={COMPARE_LIMIT}
           />
         )}
       </main>
       
       {/* Compare Bar */}
-      {compareIds.size > 0 && !selectedPlayerId && !viewingCompare && (
+      {/* --- ⭐️ 4. CHANGED .size TO .length --- */}
+      {compareIds.length > 0 && !selectedPlayerId && !viewingCompare && (
         <div className="sticky bottom-0 left-0 w-full bg-highlight-dark border-t-2 border-blue-500 shadow-lg p-4">
           <div className="max-w-7xl mx-auto flex justify-between items-center">
-            {/* --- ⭐️ 4. UPDATED BAR TEXT --- */}
-            <p className="text-lg font-semibold">Comparing {compareIds.size} / {COMPARE_LIMIT} players</p>
+            <p className="text-lg font-semibold">Comparing {compareIds.length} / {COMPARE_LIMIT} players</p>
             <div>
               <button
                 onClick={handleClearCompare}
@@ -103,8 +124,7 @@ function App() {
               </button>
               <button
                 onClick={() => setViewingCompare(true)}
-                // --- ⭐️ 5. DISABLE BUTTON IF LESS THAN 2 PLAYERS ---
-                disabled={compareIds.size < 2}
+                disabled={compareIds.length < 2}
                 className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-500
                            disabled:bg-neutral-600 disabled:cursor-not-allowed"
               >

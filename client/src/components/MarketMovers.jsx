@@ -1,21 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
+// --- ⭐️ 1. IMPORT 'motion' FROM FRAMER MOTION ---
+import { motion } from 'framer-motion';
+
+// --- ⭐️ 2. DEFINE OUR ANIMATIONS ---
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1, // Each child will animate 0.1s after the previous
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 }, // Start invisible and 20px down
+  visible: {
+    opacity: 1,
+    y: 0, // Animate to visible and 0px
+    transition: {
+      type: 'spring',
+      stiffness: 100,
+    },
+  },
+};
 
 // A reusable component for each player card
 function MoverCard({ player, onPlayerClick }) {
-  // Add a check in case player data is bad
-  if (!player || typeof player.value_change === 'undefined') {
-    return null;
-  }
-  
   const isRiser = player.value_change > 0;
   
   return (
-    <div
-      onClick={() => onPlayerClick(player.player_id)}
+    // --- ⭐️ 3. WRAP THE CARD IN A 'motion.div' ---
+    <motion.div
+      variants={itemVariants} // Use the item animation
       className="flex items-center justify-between p-3 bg-highlight-dark border border-highlight-light rounded-lg 
                  cursor-pointer transition-all duration-200 hover:bg-highlight-light hover:border-blue-500"
+      onClick={() => onPlayerClick(player.player_id)}
     >
       <div>
         <p className="text-sm font-semibold truncate">{player.full_name}</p>
@@ -25,7 +47,7 @@ function MoverCard({ player, onPlayerClick }) {
         {isRiser ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
         <span className="ml-1">{player.value_change.toFixed(2)}</span>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -38,11 +60,7 @@ function MarketMovers({ onPlayerClick, apiUrl }) {
     async function fetchMarketMovers() {
       try {
         const response = await axios.get(`${apiUrl}/market-movers`);
-        
-        // --- ⭐️ THIS IS THE FIX ⭐️ ---
-        // It was "setMovers(.data);"
         setMovers(response.data || { risers: [], fallers: [] });
-
       } catch (error) {
         console.error("Error fetching market movers:", error);
         setMovers({ risers: [], fallers: [] });
@@ -61,7 +79,6 @@ function MarketMovers({ onPlayerClick, apiUrl }) {
     );
   }
 
-  // Check if movers exists *and* has risers or fallers
   const hasData = movers && (movers.risers?.length > 0 || movers.fallers?.length > 0);
 
   return (
@@ -73,11 +90,17 @@ function MarketMovers({ onPlayerClick, apiUrl }) {
             <h2 className="flex items-center gap-2 text-2xl font-semibold mb-4 text-green-400">
               <TrendingUp size={24} /> Top Risers
             </h2>
-            <div className="space-y-3">
+            {/* --- ⭐️ 4. WRAP THE LIST IN A 'motion.div' --- */}
+            <motion.div
+              className="space-y-3"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible" // Animate when it appears
+            >
               {movers.risers.map(player => (
                 <MoverCard key={player.player_id} player={player} onPlayerClick={onPlayerClick} />
               ))}
-            </div>
+            </motion.div>
           </div>
           
           {/* Fallers Column */}
@@ -85,11 +108,17 @@ function MarketMovers({ onPlayerClick, apiUrl }) {
             <h2 className="flex items-center gap-2 text-2xl font-semibold mb-4 text-red-400">
               <TrendingDown size={24} /> Top Fallers
             </h2>
-            <div className="space-y-3">
+            {/* --- ⭐️ 5. WRAP THE LIST IN A 'motion.div' --- */}
+            <motion.div
+              className="space-y-3"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+            >
               {movers.fallers.map(player => (
                 <MoverCard key={player.player_id} player={player} onPlayerClick={onPlayerClick} />
               ))}
-            </div>
+            </motion.div>
           </div>
         </div>
       ) : (
