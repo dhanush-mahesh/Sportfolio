@@ -364,3 +364,107 @@ def get_daily_insights():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# --- AI PRICE PREDICTION ENDPOINTS ---
+
+@app.get("/ai/predict/{player_id}")
+def predict_player_price(player_id: str, days: int = 7):
+    """Predict future price for a specific player"""
+    try:
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), '../scraper'))
+        from ai_price_predictor import AIPricePredictor
+        
+        predictor = AIPricePredictor()
+        predictions = predictor.predict_future_value(player_id, days_ahead=days)
+        momentum = predictor.get_price_momentum(player_id)
+        
+        if not predictions:
+            return {
+                "error": "Insufficient data for prediction",
+                "message": "Need at least 5 days of historical data"
+            }
+        
+        return {
+            "player_id": player_id,
+            "predictions": predictions,
+            "momentum": momentum,
+            "prediction_horizon": f"{days} days",
+            "generated_at": datetime.datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/ai/trending-players")
+def get_trending_players(limit: int = 10):
+    """Get players with strong upward price trends"""
+    try:
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), '../scraper'))
+        from ai_price_predictor import AIPricePredictor
+        
+        predictor = AIPricePredictor()
+        trending = predictor.find_trending_players(limit)
+        
+        return {
+            "count": len(trending),
+            "players": trending,
+            "description": "Players with strong upward price momentum and positive predictions"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/ai/value-drops")
+def get_value_drops(limit: int = 10):
+    """Get players with recent value drops (potential recovery plays)"""
+    try:
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), '../scraper'))
+        from ai_price_predictor import AIPricePredictor
+        
+        predictor = AIPricePredictor()
+        drops = predictor.find_value_drops(limit)
+        
+        return {
+            "count": len(drops),
+            "players": drops,
+            "description": "Players with recent value drops that may recover"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/ai/price-forecast")
+def get_price_forecast():
+    """Get comprehensive price forecast report"""
+    try:
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), '../scraper'))
+        from ai_price_predictor import AIPricePredictor
+        
+        predictor = AIPricePredictor()
+        
+        trending = predictor.find_trending_players(5)
+        drops = predictor.find_value_drops(5)
+        
+        return {
+            "generated_at": datetime.datetime.now().isoformat(),
+            "trending_players": {
+                "count": len(trending),
+                "players": trending
+            },
+            "value_drops": {
+                "count": len(drops),
+                "players": drops
+            },
+            "summary": {
+                "total_predictions": len(trending) + len(drops),
+                "strong_buy_signals": sum(1 for d in drops if d.get('buy_signal', False)),
+                "high_confidence_predictions": sum(1 for t in trending if t.get('prediction_confidence', 0) > 0.7)
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

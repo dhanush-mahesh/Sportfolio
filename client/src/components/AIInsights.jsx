@@ -5,9 +5,11 @@ function AIInsights({ apiUrl, onPlayerClick }) {
   const [insights, setInsights] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [priceForecast, setPriceForecast] = useState(null);
 
   useEffect(() => {
     fetchInsights();
+    fetchPriceForecast();
   }, []);
 
   const fetchInsights = async () => {
@@ -19,6 +21,15 @@ function AIInsights({ apiUrl, onPlayerClick }) {
       console.error('Error fetching AI insights:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPriceForecast = async () => {
+    try {
+      const response = await axios.get(`${apiUrl}/ai/price-forecast`);
+      setPriceForecast(response.data);
+    } catch (error) {
+      console.error('Error fetching price forecast:', error);
     }
   };
 
@@ -111,10 +122,10 @@ function AIInsights({ apiUrl, onPlayerClick }) {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-neutral-700">
+      <div className="flex gap-2 border-b border-neutral-700 overflow-x-auto">
         <button
           onClick={() => setActiveTab('overview')}
-          className={`px-4 py-2 font-semibold ${
+          className={`px-4 py-2 font-semibold whitespace-nowrap ${
             activeTab === 'overview'
               ? 'text-blue-500 border-b-2 border-blue-500'
               : 'text-neutral-400 hover:text-white'
@@ -123,8 +134,18 @@ function AIInsights({ apiUrl, onPlayerClick }) {
           Overview
         </button>
         <button
+          onClick={() => setActiveTab('predictions')}
+          className={`px-4 py-2 font-semibold whitespace-nowrap ${
+            activeTab === 'predictions'
+              ? 'text-blue-500 border-b-2 border-blue-500'
+              : 'text-neutral-400 hover:text-white'
+          }`}
+        >
+          🔮 Predictions ({priceForecast ? priceForecast.summary.total_predictions : 0})
+        </button>
+        <button
           onClick={() => setActiveTab('buy')}
-          className={`px-4 py-2 font-semibold ${
+          className={`px-4 py-2 font-semibold whitespace-nowrap ${
             activeTab === 'buy'
               ? 'text-blue-500 border-b-2 border-blue-500'
               : 'text-neutral-400 hover:text-white'
@@ -134,7 +155,7 @@ function AIInsights({ apiUrl, onPlayerClick }) {
         </button>
         <button
           onClick={() => setActiveTab('sell')}
-          className={`px-4 py-2 font-semibold ${
+          className={`px-4 py-2 font-semibold whitespace-nowrap ${
             activeTab === 'sell'
               ? 'text-blue-500 border-b-2 border-blue-500'
               : 'text-neutral-400 hover:text-white'
@@ -144,7 +165,7 @@ function AIInsights({ apiUrl, onPlayerClick }) {
         </button>
         <button
           onClick={() => setActiveTab('breakout')}
-          className={`px-4 py-2 font-semibold ${
+          className={`px-4 py-2 font-semibold whitespace-nowrap ${
             activeTab === 'breakout'
               ? 'text-blue-500 border-b-2 border-blue-500'
               : 'text-neutral-400 hover:text-white'
@@ -271,6 +292,138 @@ function AIInsights({ apiUrl, onPlayerClick }) {
           )}
         </div>
       )}
+
+      {activeTab === 'predictions' && priceForecast && (
+        <div className="space-y-6">
+          {/* Trending Players */}
+          {priceForecast.trending_players.count > 0 && (
+            <div>
+              <h2 className="text-xl font-bold mb-4">📈 Trending Players (Price Rising)</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {priceForecast.trending_players.players.map((player) => (
+                  <PredictionCard
+                    key={player.player_id}
+                    player={player}
+                    type="trending"
+                    onPlayerClick={onPlayerClick}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Value Drops */}
+          {priceForecast.value_drops.count > 0 && (
+            <div>
+              <h2 className="text-xl font-bold mb-4">💎 Value Drops (Buy the Dip)</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {priceForecast.value_drops.players.map((player) => (
+                  <PredictionCard
+                    key={player.player_id}
+                    player={player}
+                    type="drop"
+                    onPlayerClick={onPlayerClick}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {priceForecast.trending_players.count === 0 && priceForecast.value_drops.count === 0 && (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">🔮</div>
+              <h3 className="text-xl font-bold mb-2">Building Prediction Models</h3>
+              <p className="text-neutral-400 mb-4">
+                Price predictions require at least 5-7 days of historical data per player.
+              </p>
+              <p className="text-sm text-neutral-500">
+                Check back tomorrow as more data becomes available!
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PredictionCard({ player, type, onPlayerClick }) {
+  const isTrending = type === 'trending';
+  const bgColor = isTrending ? 'bg-green-900/10 border-green-700' : 'bg-blue-900/10 border-blue-700';
+  const badgeColor = isTrending ? 'bg-green-600' : 'bg-blue-600';
+
+  return (
+    <div className={`${bgColor} border rounded-lg p-4 hover:border-blue-500 transition-colors cursor-pointer`}
+         onClick={() => onPlayerClick(player.player_id)}>
+      <div className="flex justify-between items-start mb-3">
+        <div>
+          <h3 className="font-bold text-lg">{player.player_name}</h3>
+          <p className="text-sm text-neutral-400">{player.team} • {player.position}</p>
+        </div>
+        <span className={`${badgeColor} text-white text-xs px-2 py-1 rounded font-semibold`}>
+          {isTrending ? 'TRENDING' : 'DIP'}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="bg-highlight-dark rounded p-2">
+          <div className="text-xs text-neutral-400">Current Value</div>
+          <div className="text-lg font-bold">{player.current_value.toFixed(1)}</div>
+        </div>
+        <div className="bg-highlight-dark rounded p-2">
+          <div className="text-xs text-neutral-400">Week Ago</div>
+          <div className="text-lg font-bold">{player.week_ago_value.toFixed(1)}</div>
+        </div>
+      </div>
+
+      <div className="space-y-2 mb-3">
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-neutral-400">Weekly Change:</span>
+          <span className={`font-semibold ${isTrending ? 'text-green-400' : 'text-red-400'}`}>
+            {isTrending ? player.trend_pct : player.drop_pct}%
+          </span>
+        </div>
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-neutral-400">Predicted (7d):</span>
+          <span className="font-semibold text-blue-400">
+            {player.predicted_7day.toFixed(1)}
+          </span>
+        </div>
+        {!isTrending && player.predicted_recovery && (
+          <div className="flex justify-between items-center text-sm">
+            <span className="text-neutral-400">Recovery:</span>
+            <span className={`font-semibold ${player.predicted_recovery > 0 ? 'text-green-400' : 'text-red-400'}`}>
+              {player.predicted_recovery > 0 ? '+' : ''}{player.predicted_recovery}%
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-between items-center pt-3 border-t border-neutral-700">
+        <div className="flex items-center gap-2">
+          <div className="text-xs text-neutral-400">Confidence:</div>
+          <div className="flex gap-1">
+            {[...Array(5)].map((_, i) => (
+              <div
+                key={i}
+                className={`w-2 h-2 rounded-full ${
+                  i < Math.round(player.prediction_confidence * 5)
+                    ? 'bg-blue-500'
+                    : 'bg-neutral-700'
+                }`}
+              />
+            ))}
+          </div>
+          <span className="text-xs text-neutral-400">
+            {(player.prediction_confidence * 100).toFixed(0)}%
+          </span>
+        </div>
+        {!isTrending && player.buy_signal && (
+          <span className="text-xs font-semibold text-green-400">
+            ✅ BUY SIGNAL
+          </span>
+        )}
+      </div>
     </div>
   );
 }
