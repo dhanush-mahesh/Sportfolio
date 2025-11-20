@@ -24,11 +24,10 @@ function PlayerList({ allPlayers, featuredPlayers, loading, onPlayerClick, apiUr
   return (
     <div className="flex flex-col"> 
       
-      <div className="text-center max-w-2xl mx-auto mb-12 mt-2">
-        <img src="/SportfolioLogo.png" alt="Sportfolio Logo" className="w-60 h-50 mx-auto mb-4 cursor-pointer"/>
+      <div className="text-center max-w-2xl mx-auto mb-8 mt-4">
         <h1 className="text-6xl font-extrabold tracking-tighter text-transparent 
                        bg-clip-text bg-gradient-to-r from-purple-400 via-blue-500 to-green-400 
-                       bg-200% animate-text-shimmer mb-4">
+                       bg-200% animate-text-shimmer mb-6">
           Sportfolio
         </h1>
         <p className="text-xl text-neutral-400">
@@ -68,7 +67,7 @@ function PlayerList({ allPlayers, featuredPlayers, loading, onPlayerClick, apiUr
             
             {/* --- ⭐️ THIS IS THE FIX ⭐️ --- */}
             <p className="text-sm text-neutral-500">
-              Select 2-{compareLimit} players to compare{" "}
+              Select up tp 3 players to compare using the + icon {" "}
               <span className="font-semibold text-neutral-200">
                 ({compareIds.length}/{compareLimit})
               </span>
@@ -125,7 +124,7 @@ function PlayerList({ allPlayers, featuredPlayers, loading, onPlayerClick, apiUr
 
           {searchQuery === "" && allPlayers && (
             <p className="text-center text-neutral-500 mt-12">
-              Start typing to search {allPlayers.length} players...
+              Start typing to search all {allPlayers.length} players...
             </p>
           )}
         </div>

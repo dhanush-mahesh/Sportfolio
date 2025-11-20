@@ -8,3 +8,6 @@ torch
 nba-api
 safetensors
 pandas
+praw
+beautifulsoup4
+lxml

@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
+import datetime
 # --- ⭐️ 1. ADDED IMPORTS FOR THE NEW ENDPOINT ---
 from typing import List
 from pydantic import BaseModel
@@ -62,7 +63,9 @@ def get_player_info(player_id: str):
 @app.get("/player/{player_id}/value_history")
 def get_player_value_history(player_id: str):
     try:
-        response = supabase.table('player_value_index').select('value_date, value_score').eq('player_id', player_id).order('value_date').execute()
+        response = supabase.table('player_value_index').select(
+            'value_date, value_score, stat_component, sentiment_component, momentum_score, confidence_score'
+        ).eq('player_id', player_id).order('value_date').execute()
         return response.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -92,7 +95,94 @@ def get_player_season_stats(player_id: str):
 @app.get("/player/{player_id}/news")
 def get_player_news(player_id: str):
     try:
-        response = supabase.table('daily_player_sentiment').select('article_date, headline_text, sentiment_score').eq('player_id', player_id).order('article_date', desc=True).limit(5).execute()
+        response = supabase.table('daily_player_sentiment').select(
+            'article_date, headline_text, sentiment_score, source, url'
+        ).eq('player_id', player_id).order('article_date', desc=True).limit(10).execute()
+        return response.data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/player/{player_id}/sentiment_breakdown")
+def get_player_sentiment_breakdown(player_id: str):
+    """Get sentiment breakdown by source for a player"""
+    try:
+        # Get recent sentiment data
+        response = supabase.table('daily_player_sentiment').select(
+            'sentiment_score, source'
+        ).eq('player_id', player_id).execute()
+        
+        if not response.data:
+            return {"total_mentions": 0, "by_source": {}, "avg_sentiment": 0}
+        
+        # Group by source
+        by_source = {}
+        total_sentiment = 0
+        
+        for item in response.data:
+            source = item.get('source', 'unknown')
+            score = item['sentiment_score']
+            
+            if source not in by_source:
+                by_source[source] = {
+                    "count": 0,
+                    "avg_sentiment": 0,
+                    "total": 0
+                }
+            
+            by_source[source]["count"] += 1
+            by_source[source]["total"] += score
+            total_sentiment += score
+        
+        # Calculate averages
+        for source in by_source:
+            by_source[source]["avg_sentiment"] = by_source[source]["total"] / by_source[source]["count"]
+            del by_source[source]["total"]
+        
+        return {
+            "total_mentions": len(response.data),
+            "by_source": by_source,
+            "avg_sentiment": total_sentiment / len(response.data) if response.data else 0
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/player/{player_id}/enhanced_metrics")
+def get_player_enhanced_metrics(player_id: str):
+    """Get the latest enhanced metrics for a player"""
+    try:
+        response = supabase.table('player_value_index').select(
+            'value_date, value_score, stat_component, sentiment_component, momentum_score, confidence_score'
+        ).eq('player_id', player_id).order('value_date', desc=True).limit(1).maybe_single().execute()
+        
+        if not response.data:
+            return None
+        
+        # Add momentum status
+        momentum = response.data.get('momentum_score', 0)
+        if momentum > 0.5:
+            status = "🔥 Hot"
+        elif momentum > 0.2:
+            status = "📈 Rising"
+        elif momentum > -0.2:
+            status = "➡️ Stable"
+        elif momentum > -0.5:
+            status = "📉 Falling"
+        else:
+            status = "🧊 Cold"
+        
+        response.data['momentum_status'] = status
+        
+        # Add confidence level
+        confidence = response.data.get('confidence_score', 0)
+        if confidence > 0.7:
+            confidence_level = "High"
+        elif confidence > 0.4:
+            confidence_level = "Medium"
+        else:
+            confidence_level = "Low"
+        
+        response.data['confidence_level'] = confidence_level
+        
         return response.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -155,5 +245,122 @@ def get_compare_data(request: CompareRequest):
         
         return player_data
         
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- AI TRADE ADVISOR ENDPOINTS ---
+
+@app.get("/ai/buy-opportunities")
+def get_buy_opportunities(limit: int = 10):
+    """Get AI-recommended buy opportunities (undervalued players)"""
+    try:
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), '../scraper'))
+        from ai_trade_advisor import AITradeAdvisor
+        
+        advisor = AITradeAdvisor()
+        opportunities = advisor.find_buy_opportunities(limit)
+        
+        return {
+            "count": len(opportunities),
+            "opportunities": opportunities,
+            "description": "Players with strong stats but negative sentiment - potential buy low opportunities"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/ai/sell-opportunities")
+def get_sell_opportunities(limit: int = 10):
+    """Get AI-recommended sell opportunities (overvalued players)"""
+    try:
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), '../scraper'))
+        from ai_trade_advisor import AITradeAdvisor
+        
+        advisor = AITradeAdvisor()
+        opportunities = advisor.find_sell_opportunities(limit)
+        
+        return {
+            "count": len(opportunities),
+            "opportunities": opportunities,
+            "description": "Players with high sentiment but weak stats - potential sell high opportunities"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/ai/breakout-candidates")
+def get_breakout_candidates(limit: int = 10):
+    """Get AI-identified breakout candidates"""
+    try:
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), '../scraper'))
+        from ai_trade_advisor import AITradeAdvisor
+        
+        advisor = AITradeAdvisor()
+        candidates = advisor.find_breakout_candidates(limit)
+        
+        return {
+            "count": len(candidates),
+            "candidates": candidates,
+            "description": "Players with positive momentum and rising sentiment - watch for breakouts"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/ai/portfolio-analysis")
+def analyze_portfolio(request: CompareRequest):
+    """Analyze risk and performance of a portfolio of players"""
+    try:
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), '../scraper'))
+        from ai_trade_advisor import AITradeAdvisor
+        
+        advisor = AITradeAdvisor()
+        analysis = advisor.analyze_portfolio_risk(request.player_ids)
+        
+        return analysis
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/ai/daily-insights")
+def get_daily_insights():
+    """Get comprehensive daily AI insights"""
+    try:
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), '../scraper'))
+        from ai_trade_advisor import AITradeAdvisor
+        
+        advisor = AITradeAdvisor()
+        
+        buy_ops = advisor.find_buy_opportunities(5)
+        sell_ops = advisor.find_sell_opportunities(5)
+        breakouts = advisor.find_breakout_candidates(5)
+        
+        return {
+            "generated_at": datetime.datetime.now().isoformat(),
+            "buy_opportunities": {
+                "count": len(buy_ops),
+                "players": buy_ops
+            },
+            "sell_opportunities": {
+                "count": len(sell_ops),
+                "players": sell_ops
+            },
+            "breakout_candidates": {
+                "count": len(breakouts),
+                "players": breakouts
+            },
+            "summary": {
+                "total_opportunities": len(buy_ops) + len(sell_ops),
+                "high_urgency_buys": sum(1 for o in buy_ops if o['urgency'] == 'high'),
+                "high_urgency_sells": sum(1 for o in sell_ops if o['urgency'] == 'high'),
+                "high_potential_breakouts": sum(1 for b in breakouts if b['potential'] == 'high')
+            }
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

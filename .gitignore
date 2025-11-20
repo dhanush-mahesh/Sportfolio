@@ -1,29 +1,65 @@
-# Ignore Python virtual environments
+# Python virtual environments
 /scraper/scraper_env/
+/api/api_env/
+venv/
+env/
+*.egg-info/
 
-# Ignore environment variable files
+# Environment variable files
 .env
+.env.local
+.env.*.local
 scraper/.env
 api/.env
 client/.env
 
-# Ignore Python cache
+# Python cache
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
 
-# Ignore VSCode settings
+# VSCode settings
 .vscode/
+.idea/
 
-# Ignore Mac system files
+# Mac system files
 .DS_Store
-EOT # React/Vite client
+.AppleDouble
+.LSOverride
+
+# React/Vite client
 client/node_modules/
 client/dist/
 client/.eslintcache
-# Debug scripts
-scraper/debug_api.py
-scraper/debug_columns.py
+client/build/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
 # Debug scripts
 scraper/debug_api.py
 scraper/debug_columns.py
 scraper/debug_roster.py
+
+# Documentation (optional - remove if you want to push docs)
+# ENHANCED_SENTIMENT_README.md
+# ENHANCED_SENTIMENT_SUMMARY.md
+# AI_TRADE_ADVISOR_GUIDE.md
+# AI_FEATURE_SUMMARY.md
+# HOW_TO_SEE_AI_INSIGHTS.md
+# SENTIMENT_CALCULATION_EXPLAINED.md
+# RUNNING_STATUS.md
+# SYSTEM_STATUS.md
+# FILES_TO_DELETE.md
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
