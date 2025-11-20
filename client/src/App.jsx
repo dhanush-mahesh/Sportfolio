@@ -4,6 +4,7 @@ import PlayerList from './components/PlayerList'
 import PlayerPage from './components/PlayerPage'
 import ComparePage from './components/ComparePage'
 import AIInsights from './components/AIInsights'
+import LiveScores from './components/LiveScores'
 
 const API_URL = 'http://127.0.0.1:8000'
 const COMPARE_LIMIT = 3 // We'll keep the 3-player limit logic
@@ -113,6 +114,19 @@ function App() {
                 </button>
                 <button
                   onClick={() => {
+                    setCurrentView('live');
+                    setViewingCompare(false);
+                  }}
+                  className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                    currentView === 'live'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-neutral-400 hover:text-white hover:bg-neutral-700'
+                  }`}
+                >
+                  Live Scores
+                </button>
+                <button
+                  onClick={() => {
                     setCurrentView('ai');
                     setViewingCompare(false);
                   }}
@@ -136,6 +150,11 @@ function App() {
             playerId={selectedPlayerId}
             onBackClick={() => setSelectedPlayerId(null)}
             apiUrl={API_URL}
+          />
+        ) : currentView === 'live' ? (
+          <LiveScores
+            apiUrl={API_URL}
+            onPlayerClick={(id) => setSelectedPlayerId(id)}
           />
         ) : currentView === 'ai' ? (
           <AIInsights

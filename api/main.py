@@ -468,3 +468,82 @@ def get_price_forecast():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# --- LIVE SCORES ENDPOINTS ---
+
+@app.get("/live/scores")
+def get_live_scores(date: str = None):
+    """Get live scores for a specific date (defaults to today)"""
+    try:
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), '../scraper'))
+        from live_scores import LiveScores
+        
+        live = LiveScores()
+        
+        # Parse date if provided, otherwise use today
+        if date:
+            try:
+                target_date = datetime.datetime.strptime(date, '%Y-%m-%d').date()
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+        else:
+            target_date = datetime.date.today()
+        
+        # Use the new date-specific method
+        games = live.get_games_by_date(target_date)
+        
+        return {
+            "date": target_date.isoformat(),
+            "games_count": len(games),
+            "games": games,
+            "live_games": [g for g in games if g['is_live']],
+            "completed_games": [g for g in games if g['is_final']],
+            "upcoming_games": [g for g in games if not g['is_live'] and not g['is_final']]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/live/game/{game_id}")
+def get_live_game(game_id: str):
+    """Get live box score for a specific game (from API or database)"""
+    try:
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), '../scraper'))
+        from live_scores import LiveScores
+        
+        live = LiveScores()
+        box_score = live.get_live_box_score(game_id, save_to_db=True)
+        
+        if not box_score:
+            raise HTTPException(status_code=404, detail="Game not found or no data available")
+        
+        return box_score
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/live/top-performers")
+def get_top_performers():
+    """Get top performers from today's games"""
+    try:
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), '../scraper'))
+        from live_scores import LiveScores
+        
+        live = LiveScores()
+        performers = live.get_top_performers()
+        
+        return {
+            "date": datetime.date.today().isoformat(),
+            "count": len(performers),
+            "performers": performers
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
