@@ -236,13 +236,34 @@ class LiveScores:
                 
                 live_games = []
                 
+                # Helper function to format game clock
+                def format_clock(clock_str):
+                    if not clock_str or clock_str == '':
+                        return ''
+                    try:
+                        if clock_str.startswith('PT'):
+                            clock_str = clock_str[2:]
+                            minutes = 0
+                            seconds = 0
+                            if 'M' in clock_str:
+                                parts = clock_str.split('M')
+                                minutes = int(parts[0])
+                                if 'S' in parts[1]:
+                                    seconds = int(float(parts[1].replace('S', '')))
+                            elif 'S' in clock_str:
+                                seconds = int(float(clock_str.replace('S', '')))
+                            return f"{minutes}:{seconds:02d}"
+                        return clock_str
+                    except:
+                        return clock_str
+                
                 for game in games:
                     game_data = {
                         'game_id': game['gameId'],
                         'game_status': game['gameStatus'],
                         'game_status_text': game['gameStatusText'],
                         'period': game.get('period', 0),
-                        'game_clock': game.get('gameClock', ''),
+                        'game_clock': format_clock(game.get('gameClock', '')),
                         'home_team': {
                             'team_id': game['homeTeam']['teamId'],
                             'team_name': game['homeTeam']['teamName'],
@@ -299,13 +320,34 @@ class LiveScores:
             
             live_games = []
             
+            # Helper function to format game clock
+            def format_clock(clock_str):
+                if not clock_str or clock_str == '':
+                    return ''
+                try:
+                    if clock_str.startswith('PT'):
+                        clock_str = clock_str[2:]
+                        minutes = 0
+                        seconds = 0
+                        if 'M' in clock_str:
+                            parts = clock_str.split('M')
+                            minutes = int(parts[0])
+                            if 'S' in parts[1]:
+                                seconds = int(float(parts[1].replace('S', '')))
+                        elif 'S' in clock_str:
+                            seconds = int(float(clock_str.replace('S', '')))
+                        return f"{minutes}:{seconds:02d}"
+                    return clock_str
+                except:
+                    return clock_str
+            
             for game in games:
                 game_data = {
                     'game_id': game['gameId'],
                     'game_status': game['gameStatus'],  # 1=scheduled, 2=live, 3=finished
                     'game_status_text': game['gameStatusText'],
                     'period': game.get('period', 0),
-                    'game_clock': game.get('gameClock', ''),
+                    'game_clock': format_clock(game.get('gameClock', '')),
                     'home_team': {
                         'team_id': game['homeTeam']['teamId'],
                         'team_name': game['homeTeam']['teamName'],
@@ -357,53 +399,116 @@ class LiveScores:
             home_players = []
             away_players = []
             
+            # Helper function to safely convert to int
+            def safe_int(value, default=0):
+                try:
+                    return int(value) if value is not None else default
+                except (ValueError, TypeError):
+                    return default
+            
+            # Helper function to safely convert to float
+            def safe_float(value, default=0.0):
+                try:
+                    return float(value) if value is not None else default
+                except (ValueError, TypeError):
+                    return default
+            
+            # Helper function to format minutes from ISO 8601 duration
+            def format_minutes(minutes_str):
+                if not minutes_str or minutes_str == '':
+                    return '0:00'
+                try:
+                    if minutes_str.startswith('PT'):
+                        minutes_str = minutes_str[2:]
+                        minutes = 0
+                        seconds = 0
+                        if 'M' in minutes_str:
+                            parts = minutes_str.split('M')
+                            minutes = int(parts[0])
+                            if 'S' in parts[1]:
+                                seconds = int(float(parts[1].replace('S', '')))
+                        elif 'S' in minutes_str:
+                            seconds = int(float(minutes_str.replace('S', '')))
+                        return f"{minutes}:{seconds:02d}"
+                    return minutes_str
+                except:
+                    return '0:00'
+            
             # Home team players
             if hasattr(box, 'home_team_player_stats'):
                 for player in box.home_team_player_stats.get_dict():
-                    if player.get('played') == '1':
-                        player_stats = {
-                            'player_id': player['personId'],
-                            'name': player['name'],
-                            'position': player.get('position', ''),
-                            'minutes': player.get('minutes', '0:00'),
-                            'points': player.get('points', 0),
-                            'rebounds': player.get('reboundsTotal', 0),
-                            'assists': player.get('assists', 0),
-                            'steals': player.get('steals', 0),
-                            'blocks': player.get('blocks', 0),
-                            'turnovers': player.get('turnovers', 0),
-                            'fg_made': player.get('fieldGoalsMade', 0),
-                            'fg_attempted': player.get('fieldGoalsAttempted', 0),
-                            'fg_pct': player.get('fieldGoalsPercentage', 0),
-                            'three_made': player.get('threePointersMade', 0),
-                            'three_attempted': player.get('threePointersAttempted', 0),
-                            'plus_minus': player.get('plusMinusPoints', 0)
-                        }
-                        home_players.append(player_stats)
+                    # Stats are nested in 'statistics' object
+                    stats = player.get('statistics', {})
+                    
+                    player_stats = {
+                        'player_id': player.get('personId', 0),
+                        'name': player.get('name', 'Unknown'),
+                        'position': player.get('position', ''),
+                        'minutes': format_minutes(stats.get('minutes', '0:00')),
+                        'points': safe_int(stats.get('points')),
+                        'rebounds': safe_int(stats.get('reboundsTotal')),
+                        'assists': safe_int(stats.get('assists')),
+                        'steals': safe_int(stats.get('steals')),
+                        'blocks': safe_int(stats.get('blocks')),
+                        'turnovers': safe_int(stats.get('turnovers')),
+                        'fg_made': safe_int(stats.get('fieldGoalsMade')),
+                        'fg_attempted': safe_int(stats.get('fieldGoalsAttempted')),
+                        'fg_pct': safe_float(stats.get('fieldGoalsPercentage')),
+                        'three_made': safe_int(stats.get('threePointersMade')),
+                        'three_attempted': safe_int(stats.get('threePointersAttempted')),
+                        'plus_minus': safe_int(stats.get('plusMinusPoints'))
+                    }
+                    home_players.append(player_stats)
             
             # Away team players
             if hasattr(box, 'away_team_player_stats'):
                 for player in box.away_team_player_stats.get_dict():
-                    if player.get('played') == '1':
-                        player_stats = {
-                            'player_id': player['personId'],
-                            'name': player['name'],
-                            'position': player.get('position', ''),
-                            'minutes': player.get('minutes', '0:00'),
-                            'points': player.get('points', 0),
-                            'rebounds': player.get('reboundsTotal', 0),
-                            'assists': player.get('assists', 0),
-                            'steals': player.get('steals', 0),
-                            'blocks': player.get('blocks', 0),
-                            'turnovers': player.get('turnovers', 0),
-                            'fg_made': player.get('fieldGoalsMade', 0),
-                            'fg_attempted': player.get('fieldGoalsAttempted', 0),
-                            'fg_pct': player.get('fieldGoalsPercentage', 0),
-                            'three_made': player.get('threePointersMade', 0),
-                            'three_attempted': player.get('threePointersAttempted', 0),
-                            'plus_minus': player.get('plusMinusPoints', 0)
-                        }
-                        away_players.append(player_stats)
+                    # Stats are nested in 'statistics' object
+                    stats = player.get('statistics', {})
+                    
+                    player_stats = {
+                        'player_id': player.get('personId', 0),
+                        'name': player.get('name', 'Unknown'),
+                        'position': player.get('position', ''),
+                        'minutes': format_minutes(stats.get('minutes', '0:00')),
+                        'points': safe_int(stats.get('points')),
+                        'rebounds': safe_int(stats.get('reboundsTotal')),
+                        'assists': safe_int(stats.get('assists')),
+                        'steals': safe_int(stats.get('steals')),
+                        'blocks': safe_int(stats.get('blocks')),
+                        'turnovers': safe_int(stats.get('turnovers')),
+                        'fg_made': safe_int(stats.get('fieldGoalsMade')),
+                        'fg_attempted': safe_int(stats.get('fieldGoalsAttempted')),
+                        'fg_pct': safe_float(stats.get('fieldGoalsPercentage')),
+                        'three_made': safe_int(stats.get('threePointersMade')),
+                        'three_attempted': safe_int(stats.get('threePointersAttempted')),
+                        'plus_minus': safe_int(stats.get('plusMinusPoints'))
+                    }
+                    away_players.append(player_stats)
+            
+            # Helper function to format game clock from ISO 8601 duration
+            def format_game_clock(clock_str):
+                if not clock_str or clock_str == '':
+                    return ''
+                # Convert PT03M46.00S to 3:46
+                try:
+                    if clock_str.startswith('PT'):
+                        clock_str = clock_str[2:]  # Remove 'PT'
+                        minutes = 0
+                        seconds = 0
+                        
+                        if 'M' in clock_str:
+                            parts = clock_str.split('M')
+                            minutes = int(parts[0])
+                            if 'S' in parts[1]:
+                                seconds = int(float(parts[1].replace('S', '')))
+                        elif 'S' in clock_str:
+                            seconds = int(float(clock_str.replace('S', '')))
+                        
+                        return f"{minutes}:{seconds:02d}"
+                    return clock_str
+                except:
+                    return clock_str
             
             box_score_data = {
                 'game_id': game_id,
@@ -411,7 +516,7 @@ class LiveScores:
                 'away_players': sorted(away_players, key=lambda x: x['points'], reverse=True),
                 'game_status': game_data.get('gameStatus', 0),
                 'period': game_data.get('period', 0),
-                'game_clock': game_data.get('gameClock', '')
+                'game_clock': format_game_clock(game_data.get('gameClock', ''))
             }
             
             # Save to database if requested
