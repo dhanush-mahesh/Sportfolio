@@ -73,9 +73,10 @@ def get_player_value_history(player_id: str):
 def get_player_stats(player_id: str):
     try:
         response = supabase.table('daily_player_stats').select('*').eq('player_id', player_id).order('game_date', desc=True).limit(5).execute()
-        return response.data
+        return response.data if response.data else []
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Return empty array instead of error for missing data
+        return []
 
 @app.get("/player/{player_id}/season_stats")
 def get_player_season_stats(player_id: str):
@@ -87,9 +88,11 @@ def get_player_season_stats(player_id: str):
             .limit(1) \
             .maybe_single() \
             .execute()
-        return response.data
+        # Return null if no data, don't throw error
+        return response.data if response.data else None
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Return null instead of error for missing data
+        return None
 
 @app.get("/player/{player_id}/news")
 def get_player_news(player_id: str):
@@ -97,7 +100,7 @@ def get_player_news(player_id: str):
         response = supabase.table('daily_player_sentiment').select(
             'article_date, headline_text, sentiment_score, source, url'
         ).eq('player_id', player_id).order('article_date', desc=True).limit(10).execute()
-        return response.data
+        return response.data if response.data else []
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -351,6 +354,15 @@ def get_daily_insights():
         sell_ops = advisor.find_sell_opportunities(5)
         breakouts = advisor.find_breakout_candidates(5)
         
+        # Try to get ML recommendations
+        ml_recommendations = []
+        try:
+            from ml_trade_advisor import MLTradeAdvisor
+            ml_advisor = MLTradeAdvisor()
+            ml_recommendations = ml_advisor.get_ml_recommendations(5)
+        except Exception as e:
+            print(f"ML recommendations unavailable: {e}")
+        
         return {
             "generated_at": datetime.datetime.now().isoformat(),
             "buy_opportunities": {
@@ -364,6 +376,10 @@ def get_daily_insights():
             "breakout_candidates": {
                 "count": len(breakouts),
                 "players": breakouts
+            },
+            "ml_recommendations": {
+                "count": len(ml_recommendations),
+                "players": ml_recommendations
             },
             "summary": {
                 "total_opportunities": len(buy_ops) + len(sell_ops),

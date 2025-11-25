@@ -75,8 +75,57 @@ function PlayerPage({ playerId, onBackClick, apiUrl }) {
     )
   }
 
+  // Check if player has played this season
+  const hasPlayedThisSeason = stats && stats.length > 0;
+  const hasSeasonStats = seasonStats && seasonStats.games_played > 0;
+  
+  // Check for injury/inactive status from news
+  const injuryKeywords = ['injury', 'injured', 'out', 'sidelined', 'surgery', 'tear', 'sprain', 'fracture', 'inactive', 'dnp'];
+  const injuryNews = news.find(article => 
+    injuryKeywords.some(keyword => 
+      article.headline_text?.toLowerCase().includes(keyword)
+    )
+  );
+  
+  const getPlayerStatus = () => {
+    if (hasPlayedThisSeason) return null;
+    
+    if (injuryNews) {
+      return {
+        icon: '🏥',
+        title: 'Injured - No Games This Season',
+        description: injuryNews.headline_text,
+        source: injuryNews.source,
+        date: injuryNews.article_date
+      };
+    }
+    
+    return {
+      icon: '⏸️',
+      title: 'Inactive This Season',
+      description: 'This player has not played any games this season. Check news for updates on their status.',
+      source: null,
+      date: null
+    };
+  };
+  
+  const playerStatus = getPlayerStatus();
+
+  // If player data failed to load
   if (!player) {
-    return <p>Player not found.</p>
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <div className="text-6xl mb-4">⚠️</div>
+        <h2 className="text-2xl font-bold mb-2">Unable to Load Player Data</h2>
+        <p className="text-neutral-400 mb-6">There was an error loading this player's information. Please try again.</p>
+        <button
+          onClick={onBackClick}
+          className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl transition-colors"
+        >
+          Back to Player List
+        </button>
+      </div>
+    )
   }
 
   // --- ⭐️ 1. NEW LOGIC TO CALCULATE ALL 3 VALUES ---
@@ -196,7 +245,18 @@ function PlayerPage({ playerId, onBackClick, apiUrl }) {
               <BarChartHorizontal size={24} />
               Most Recent Game
             </h2>
-            {stats.length > 0 ? (
+            {!hasPlayedThisSeason && playerStatus ? (
+              <div className="text-center py-8">
+                <div className="text-4xl mb-3">{playerStatus.icon}</div>
+                <p className="text-lg font-semibold text-neutral-300 mb-2">{playerStatus.title}</p>
+                <p className="text-sm text-neutral-400 mb-3 max-w-md mx-auto">{playerStatus.description}</p>
+                {playerStatus.source && (
+                  <p className="text-xs text-neutral-600">
+                    Source: {playerStatus.source} • {new Date(playerStatus.date).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+            ) : hasPlayedThisSeason && stats.length > 0 ? (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <StatCard label="Points" value={stats[0].points} />
                 <StatCard label="Rebounds" value={stats[0].rebounds} />
@@ -205,9 +265,7 @@ function PlayerPage({ playerId, onBackClick, apiUrl }) {
                 <StatCard label="Blocks" value={stats[0].blocks} />
                 <StatCard label="TOVs" value={stats[0].turnovers} />
               </div>
-            ) : (
-              <p className="text-neutral-400">No recent game stats found.</p>
-            )}
+            ) : null}
           </div>
           
           {/* Season Stats Table */}
@@ -216,7 +274,13 @@ function PlayerPage({ playerId, onBackClick, apiUrl }) {
               <CheckSquare size={24} />
               Season Averages (Per Game)
             </h2>
-            {seasonStats ? (
+            {!hasSeasonStats && playerStatus ? (
+              <div className="text-center py-8">
+                <div className="text-4xl mb-3">📊</div>
+                <p className="text-lg font-semibold text-neutral-300 mb-2">No Season Stats Available</p>
+                <p className="text-sm text-neutral-400">{playerStatus.title}</p>
+              </div>
+            ) : hasSeasonStats && seasonStats ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
                   <thead>
@@ -236,20 +300,18 @@ function PlayerPage({ playerId, onBackClick, apiUrl }) {
                     <tr className="font-medium">
                       <td className="p-2">{seasonStats.season}</td>
                       <td className="p-2">{seasonStats.games_played}</td>
-                      <td className="p-2">{seasonStats.minutes_avg.toFixed(1)}</td>
-                      <td className="p-2">{seasonStats.points_avg.toFixed(1)}</td>
-                      <td className="p-2">{seasonStats.rebounds_avg.toFixed(1)}</td>
-                      <td className="p-2">{seasonStats.assists_avg.toFixed(1)}</td>
-                      <td className="p-2">{seasonStats.steals_avg.toFixed(1)}</td>
-                      <td className="p-2">{seasonStats.blocks_avg.toFixed(1)}</td>
-                      <td className="p-2">{seasonStats.turnovers_avg.toFixed(1)}</td>
+                      <td className="p-2">{seasonStats.minutes_avg?.toFixed(1) || 'N/A'}</td>
+                      <td className="p-2">{seasonStats.points_avg?.toFixed(1) || 'N/A'}</td>
+                      <td className="p-2">{seasonStats.rebounds_avg?.toFixed(1) || 'N/A'}</td>
+                      <td className="p-2">{seasonStats.assists_avg?.toFixed(1) || 'N/A'}</td>
+                      <td className="p-2">{seasonStats.steals_avg?.toFixed(1) || 'N/A'}</td>
+                      <td className="p-2">{seasonStats.blocks_avg?.toFixed(1) || 'N/A'}</td>
+                      <td className="p-2">{seasonStats.turnovers_avg?.toFixed(1) || 'N/A'}</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
-            ) : (
-              <p className="text-neutral-400">No season stats found for this player yet.</p>
-            )}
+            ) : null}
           </div>
           
         </div>
