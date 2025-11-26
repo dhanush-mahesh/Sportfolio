@@ -207,13 +207,13 @@ function NavigationDropdown({ currentView, setCurrentView, setViewingCompare }) 
   const [isOpen, setIsOpen] = useState(false);
 
   const menuItems = [
-    { id: 'home', label: 'Home', icon: '🏠' },
+    { id: 'home', label: 'Home', icon: '' },
     { id: 'watchlist', label: 'Watchlist', icon: '⭐' },
-    { id: 'live', label: 'Live Scores', icon: '🏀' },
-    { id: 'simulator', label: 'Trade Simulator', icon: '🔄' },
-    { id: 'ai', label: 'AI Insights', icon: '🤖' },
-    { id: 'betting', label: 'Betting Picks', icon: '🎲' },
-    { id: 'fantasy', label: 'Fantasy Lineup', icon: '⚡' },
+    { id: 'live', label: 'Live Scores', icon: '' },
+    { id: 'simulator', label: 'Trade Simulator', icon: '' },
+    { id: 'ai', label: 'AI Insights', icon: '' },
+    { id: 'betting', label: 'Betting Picks', icon: '' },
+    { id: 'fantasy', label: 'Fantasy Lineup', icon: '' },
   ];
 
   const currentItem = menuItems.find(item => item.id === currentView) || menuItems[0];

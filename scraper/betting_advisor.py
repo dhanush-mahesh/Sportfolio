@@ -444,7 +444,7 @@ class BettingAdvisor:
                 
                 # Get recent stats
                 stats = supabase.table('daily_player_stats').select(
-                    'points'
+                    'points, rebounds, assists'
                 ).eq('player_id', player['id']).order('game_date', desc=True).limit(5).execute()
                 
                 if stats.data and len(stats.data) >= 3:

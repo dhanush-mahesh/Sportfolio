@@ -122,7 +122,7 @@ function TradeSimulator({ apiUrl, onPlayerClick }) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-green-400 via-blue-400 to-purple-400 bg-clip-text text-transparent mb-2">
-            📊 Trade Simulator
+            Trade Simulator
           </h1>
           <p className="text-neutral-400">Build and analyze your portfolio</p>
         </div>
@@ -202,7 +202,7 @@ function TradeSimulator({ apiUrl, onPlayerClick }) {
             
             {portfolio.length === 0 ? (
               <div className="text-center py-8 text-neutral-400">
-                <div className="text-4xl mb-2">📈</div>
+                <div className="text-4xl mb-2">📊</div>
                 <p>Add players to start building your portfolio</p>
               </div>
             ) : (

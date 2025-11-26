@@ -39,7 +39,7 @@ function BettingPicks({ apiUrl }) {
       <div className="bg-highlight-dark rounded-lg p-6 border border-neutral-700">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-3xl font-bold">🎲 Sports Betting Picks</h1>
+            <h1 className="text-3xl font-bold">Sports Betting Picks</h1>
             <p className="text-neutral-400 mt-1">Real sportsbook lines for today's games</p>
           </div>
           <button 
@@ -67,7 +67,7 @@ function BettingPicks({ apiUrl }) {
       </div>
 
       <div>
-        <h2 className="text-xl font-bold mb-4">🔥 Best Props for Today</h2>
+        <h2 className="text-xl font-bold mb-4">Best Props for Today</h2>
         {picks.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {picks.map((pick) => (
@@ -80,7 +80,7 @@ function BettingPicks({ apiUrl }) {
                     <h3 className="font-bold text-lg">{pick.player_name}</h3>
                     <p className="text-sm text-neutral-400">{pick.team} • {pick.position}</p>
                     {pick.bookmaker && (
-                      <p className="text-xs text-blue-400 mt-1">📊 {pick.bookmaker}</p>
+                      <p className="text-xs text-blue-400 mt-1">{pick.bookmaker}</p>
                     )}
                   </div>
                   <span className={`text-xs px-2 py-1 rounded font-semibold ${
@@ -137,7 +137,7 @@ function BettingPicks({ apiUrl }) {
           </div>
         ) : (
           <div className="text-center py-12 bg-highlight-dark rounded-lg border border-neutral-700">
-            <div className="text-6xl mb-4">🎲</div>
+            <div className="text-6xl mb-4">🎯</div>
             <h3 className="text-xl font-bold mb-2">No Props Available</h3>
             <p className="text-neutral-400 mb-4">
               Props are usually posted closer to game time, or you may have reached your API limit.

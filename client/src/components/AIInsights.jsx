@@ -86,7 +86,7 @@ function AIInsights({ apiUrl, onPlayerClick }) {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2">
-              🤖 AI Trade Advisor
+              AI Trade Advisor
             </h1>
             <p className="text-neutral-400 mt-1">
               Powered by machine learning • Updated {new Date(insights.generated_at).toLocaleString()}
@@ -151,7 +151,7 @@ function AIInsights({ apiUrl, onPlayerClick }) {
               : 'text-neutral-400 hover:text-white'
           }`}
         >
-          🔮 Predictions ({priceForecast ? priceForecast.summary.total_predictions : 0})
+          Predictions ({priceForecast ? priceForecast.summary.total_predictions : 0})
         </button>
         <button
           onClick={() => setActiveTab('buy')}
@@ -161,7 +161,7 @@ function AIInsights({ apiUrl, onPlayerClick }) {
               : 'text-neutral-400 hover:text-white'
           }`}
         >
-          💰 Buy ({insights.buy_opportunities.count})
+          Buy ({insights.buy_opportunities.count})
         </button>
         <button
           onClick={() => setActiveTab('sell')}
@@ -171,7 +171,7 @@ function AIInsights({ apiUrl, onPlayerClick }) {
               : 'text-neutral-400 hover:text-white'
           }`}
         >
-          💸 Sell ({insights.sell_opportunities.count})
+          Sell ({insights.sell_opportunities.count})
         </button>
         <button
           onClick={() => setActiveTab('breakout')}
@@ -181,7 +181,7 @@ function AIInsights({ apiUrl, onPlayerClick }) {
               : 'text-neutral-400 hover:text-white'
           }`}
         >
-          🚀 Breakouts ({insights.breakout_candidates.count})
+          Breakouts ({insights.breakout_candidates.count})
         </button>
         <button
           onClick={() => setActiveTab('ml')}
@@ -192,7 +192,7 @@ function AIInsights({ apiUrl, onPlayerClick }) {
           } transition-all`}
         >
           <span className="flex items-center gap-2">
-            🤖 ML Picks ({insights.ml_recommendations?.count || 0})
+            ML Picks ({insights.ml_recommendations?.count || 0})
             <span className="text-xs px-2 py-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full text-white font-bold animate-pulse">
               NEW
             </span>
@@ -206,7 +206,7 @@ function AIInsights({ apiUrl, onPlayerClick }) {
           {/* Top Buy Opportunities */}
           {insights.buy_opportunities.count > 0 && (
             <div>
-              <h2 className="text-xl font-bold mb-4">💰 Top Buy Opportunities</h2>
+              <h2 className="text-xl font-bold mb-4">Top Buy Opportunities</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {insights.buy_opportunities.players.slice(0, 4).map((opp) => (
                   <OpportunityCard
@@ -225,7 +225,7 @@ function AIInsights({ apiUrl, onPlayerClick }) {
           {/* Top Sell Opportunities */}
           {insights.sell_opportunities.count > 0 && (
             <div>
-              <h2 className="text-xl font-bold mb-4">💸 Top Sell Opportunities</h2>
+              <h2 className="text-xl font-bold mb-4">Top Sell Opportunities</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {insights.sell_opportunities.players.slice(0, 4).map((opp) => (
                   <OpportunityCard
@@ -244,7 +244,7 @@ function AIInsights({ apiUrl, onPlayerClick }) {
           {/* Breakout Candidates */}
           {insights.breakout_candidates.count > 0 && (
             <div>
-              <h2 className="text-xl font-bold mb-4">🚀 Breakout Candidates</h2>
+              <h2 className="text-xl font-bold mb-4">Breakout Candidates</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {insights.breakout_candidates.players.slice(0, 4).map((player) => (
                   <BreakoutCard
@@ -322,7 +322,7 @@ function AIInsights({ apiUrl, onPlayerClick }) {
         <div className="space-y-6">
           <div className="bg-gradient-to-r from-purple-900/20 to-pink-900/20 border border-purple-700/50 rounded-xl p-6 mb-6">
             <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
-              <span>🤖</span> Machine Learning Predictions
+              Machine Learning Predictions
             </h2>
             <p className="text-neutral-300 mb-2">
               These recommendations are powered by a Random Forest model trained on {insights.ml_recommendations.count > 0 ? '300+' : 'historical'} player value changes.
@@ -335,7 +335,7 @@ function AIInsights({ apiUrl, onPlayerClick }) {
             {/* Explainer */}
             <details className="bg-neutral-800/50 rounded-lg p-4 cursor-pointer">
               <summary className="font-semibold text-purple-400 cursor-pointer select-none">
-                💡 What makes ML Picks different from other recommendations?
+                What makes ML Picks different from other recommendations?
               </summary>
               <div className="mt-3 space-y-3 text-sm text-neutral-300">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -361,7 +361,7 @@ function AIInsights({ apiUrl, onPlayerClick }) {
                 </div>
                 
                 <div className="bg-green-900/20 border border-green-700/50 rounded-lg p-3">
-                  <div className="font-bold text-green-400 mb-1">✨ Pro Tip</div>
+                  <div className="font-bold text-green-400 mb-1">Pro Tip</div>
                   <p className="text-xs">When both ML Picks and Buy recommendations agree on a player, it's a <span className="text-green-400 font-semibold">strong signal</span>! The ML model gets smarter as you collect more data.</p>
                 </div>
               </div>
@@ -433,7 +433,7 @@ function AIInsights({ apiUrl, onPlayerClick }) {
             </div>
           ) : (
             <div className="text-center py-12">
-              <div className="text-6xl mb-4">🤖</div>
+              <div className="text-6xl mb-4">🔬</div>
               <h3 className="text-xl font-bold mb-2">Training ML Model</h3>
               <p className="text-neutral-400 mb-4">
                 The machine learning model needs more historical data to make accurate predictions.
@@ -451,7 +451,7 @@ function AIInsights({ apiUrl, onPlayerClick }) {
           {/* Trending Players */}
           {priceForecast.trending_players.count > 0 && (
             <div>
-              <h2 className="text-xl font-bold mb-4">📈 Trending Players (Price Rising)</h2>
+              <h2 className="text-xl font-bold mb-4">Trending Players (Price Rising)</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {priceForecast.trending_players.players.map((player) => (
                   <PredictionCard
@@ -468,7 +468,7 @@ function AIInsights({ apiUrl, onPlayerClick }) {
           {/* Value Drops */}
           {priceForecast.value_drops.count > 0 && (
             <div>
-              <h2 className="text-xl font-bold mb-4">💎 Value Drops (Buy the Dip)</h2>
+              <h2 className="text-xl font-bold mb-4">Value Drops (Buy the Dip)</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {priceForecast.value_drops.players.map((player) => (
                   <PredictionCard
