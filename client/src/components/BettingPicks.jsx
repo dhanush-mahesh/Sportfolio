@@ -4,6 +4,7 @@ import axios from 'axios';
 function BettingPicks({ apiUrl }) {
   const [picks, setPicks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [modalPick, setModalPick] = useState(null);
 
   useEffect(() => {
     fetchBettingPicks();
@@ -13,8 +14,16 @@ function BettingPicks({ apiUrl }) {
     try {
       setLoading(true);
       const response = await axios.get(`${apiUrl}/betting/picks`, {
-        params: { todays_games: true }
+        params: { 
+          todays_games: true, 
+          force_refresh: true,
+          _t: Date.now() // Cache buster
+        }
       });
+      console.log('Betting picks response:', response.data);
+      console.log('First pick:', response.data.picks?.[0]);
+      console.log('First pick has last_5_games?', !!response.data.picks?.[0]?.last_5_games);
+      console.log('First pick last_5_games:', response.data.picks?.[0]?.last_5_games);
       setPicks(response.data.picks || []);
     } catch (error) {
       console.error('Error fetching betting picks:', error);
@@ -35,7 +44,165 @@ function BettingPicks({ apiUrl }) {
   }
 
   return (
-    <div className="space-y-6">
+    <>
+      {/* Modal Overlay */}
+      {modalPick && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setModalPick(null)}
+        >
+          <div 
+            className="bg-highlight-dark rounded-2xl border border-neutral-700 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-scaleIn"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-highlight-dark border-b border-neutral-700 p-6 rounded-t-2xl">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="text-2xl font-bold mb-1">{modalPick.player_name}</h3>
+                  <p className="text-neutral-400">{modalPick.team} • {modalPick.position}</p>
+                  <div className="flex items-center gap-3 mt-3">
+                    <div className="text-sm">
+                      <span className="text-neutral-400">Prop: </span>
+                      <span className="font-semibold">{modalPick.prop_type}</span>
+                    </div>
+                    <span className="text-neutral-600">•</span>
+                    <div className="text-sm">
+                      <span className="text-neutral-400">Line: </span>
+                      <span className="font-semibold text-blue-400">{modalPick.line}</span>
+                    </div>
+                    <span className="text-neutral-600">•</span>
+                    <div className="text-sm">
+                      <span className={`font-bold ${
+                        modalPick.recommendation === 'OVER' ? 'text-green-400' :
+                        modalPick.recommendation === 'UNDER' ? 'text-red-400' :
+                        'text-neutral-400'
+                      }`}>
+                        {modalPick.recommendation}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setModalPick(null)}
+                  className="text-neutral-400 hover:text-white transition-colors p-2 hover:bg-neutral-800 rounded-lg"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6">
+              {/* Stats Summary */}
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="bg-neutral-800 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-green-400">
+                    {modalPick.last_5_games.filter(g => g.stat >= modalPick.line).length}
+                  </div>
+                  <div className="text-xs text-neutral-400 mt-1">Games Over</div>
+                </div>
+                <div className="bg-neutral-800 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-blue-400">
+                    {(modalPick.last_5_games.reduce((sum, g) => sum + g.stat, 0) / modalPick.last_5_games.length).toFixed(1)}
+                  </div>
+                  <div className="text-xs text-neutral-400 mt-1">Average</div>
+                </div>
+                <div className="bg-neutral-800 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold">{modalPick.player_avg}</div>
+                  <div className="text-xs text-neutral-400 mt-1">Season Avg</div>
+                </div>
+              </div>
+
+              {/* Chart Title */}
+              <div className="mb-4">
+                <h4 className="text-lg font-bold mb-1">Last 5 Games Performance</h4>
+                <p className="text-sm text-neutral-400">{modalPick.reason}</p>
+              </div>
+
+              {/* Visual bar chart */}
+              <div className="space-y-3">
+                {modalPick.last_5_games.map((game, idx) => {
+                  const maxStat = Math.max(...modalPick.last_5_games.map(g => g.stat), modalPick.line) * 1.1;
+                  const barWidth = (game.stat / maxStat) * 100;
+                  const linePosition = (modalPick.line / maxStat) * 100;
+                  const isOver = game.stat >= modalPick.line;
+                  
+                  return (
+                    <div key={idx} className="relative">
+                      {/* Game info */}
+                      <div className="flex items-center justify-between text-sm mb-2">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="text-neutral-400 font-semibold w-16">
+                            {game.date ? new Date(game.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'N/A'}
+                          </span>
+                          {game.opponent && (
+                            <span className="text-neutral-300 truncate">vs {game.opponent}</span>
+                          )}
+                        </div>
+                        <span className={`font-bold text-lg ml-2 ${
+                          isOver ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {game.stat}
+                        </span>
+                      </div>
+                      
+                      {/* Bar chart */}
+                      <div className="relative h-8 bg-neutral-800 rounded-lg overflow-hidden shadow-inner">
+                        {/* Stat bar */}
+                        <div 
+                          className={`absolute left-0 top-0 h-full transition-all duration-500 ${
+                            isOver 
+                              ? 'bg-gradient-to-r from-green-600 to-green-500' 
+                              : 'bg-gradient-to-r from-red-600 to-red-500'
+                          }`}
+                          style={{ width: `${barWidth}%` }}
+                        />
+                        
+                        {/* Line indicator */}
+                        <div 
+                          className="absolute top-0 bottom-0 w-0.5 bg-blue-400 z-10 shadow-lg"
+                          style={{ left: `${linePosition}%` }}
+                        >
+                          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-blue-400 rounded-full shadow-lg" />
+                          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-blue-400 rounded-full shadow-lg" />
+                        </div>
+                        
+                        {/* Stat value inside bar */}
+                        <div className="absolute inset-0 flex items-center px-3">
+                          <span className="text-sm font-bold text-white drop-shadow-lg">
+                            {game.stat}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              {/* Legend */}
+              <div className="flex items-center justify-center gap-6 mt-6 pt-6 border-t border-neutral-700 text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-green-500 rounded"></div>
+                  <span className="text-neutral-300">Over Line</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-red-500 rounded"></div>
+                  <span className="text-neutral-300">Under Line</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-1 bg-blue-400 rounded"></div>
+                  <span className="text-neutral-300">Betting Line ({modalPick.line})</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-6">
       <div className="bg-highlight-dark rounded-lg p-6 border border-neutral-700">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -127,14 +294,6 @@ function BettingPicks({ apiUrl }) {
                     <span className="text-neutral-400">Consistency:</span>
                     <div className="flex items-center gap-1">
                       <span className="font-semibold">{pick.consistency}</span>
-                      {pick.consistency_explanation && (
-                        <span 
-                          className="text-xs text-neutral-500 cursor-help" 
-                          title={pick.consistency_explanation}
-                        >
-                          ⓘ
-                        </span>
-                      )}
                       {pick.matchup_adjusted && (
                         <span className="text-xs bg-blue-600 text-white px-1.5 py-0.5 rounded font-semibold">
                           MATCHUP
@@ -142,6 +301,11 @@ function BettingPicks({ apiUrl }) {
                       )}
                     </div>
                   </div>
+                  {pick.consistency_explanation && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-neutral-500">{pick.consistency_explanation}</span>
+                    </div>
+                  )}
                   {pick.opponent && (
                     <div className="flex justify-between">
                       <span className="text-neutral-400">Opponent:</span>
@@ -151,7 +315,38 @@ function BettingPicks({ apiUrl }) {
                 </div>
 
                 <div className="pt-3 border-t border-neutral-700">
-                  <p className="text-xs text-neutral-400">{pick.reason}</p>
+                  <p className="text-xs text-neutral-400 mb-3">{pick.reason}</p>
+                  
+                  {/* Last 5 Games Button */}
+                  {pick.last_5_games && pick.last_5_games.length > 0 && (
+                    <div className="mt-3">
+                      <button
+                        onClick={() => setModalPick(pick)}
+                        className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-600/20 to-purple-600/20 hover:from-blue-600/30 hover:to-purple-600/30 border border-blue-500/30 hover:border-blue-500/50 rounded-lg transition-all text-sm group"
+                      >
+                        <div className="flex items-center gap-2">
+                          <svg 
+                            className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform"
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                          </svg>
+                          <span className="font-semibold text-neutral-200">View Last 5 Games</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-green-400 font-bold">{pick.last_5_games.filter(g => g.stat >= pick.line).length}</span>
+                            <span className="text-neutral-400">/</span>
+                            <span className="text-neutral-400">{pick.last_5_games.length} over</span>
+                          </div>
+                          <span className="text-neutral-600">•</span>
+                          <span className="text-neutral-400">Avg: <span className="text-blue-400 font-semibold">{(pick.last_5_games.reduce((sum, g) => sum + g.stat, 0) / pick.last_5_games.length).toFixed(1)}</span></span>
+                        </div>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -178,6 +373,7 @@ function BettingPicks({ apiUrl }) {
         )}
       </div>
     </div>
+    </>
   );
 }
 

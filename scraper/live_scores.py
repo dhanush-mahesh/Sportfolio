@@ -165,10 +165,26 @@ class LiveScores:
     def get_box_score_from_db(self, game_id):
         """Get box score from database for a specific game"""
         try:
+            # Get player stats
             response = supabase.table('game_player_stats').select('*').eq('game_id', game_id).execute()
             
             if not response.data:
                 return None
+            
+            # Get game info for team names
+            game_response = supabase.table('games').select('*').eq('game_id', game_id).execute()
+            
+            home_team_name = 'Home Team'
+            home_team_tricode = 'HOME'
+            away_team_name = 'Away Team'
+            away_team_tricode = 'AWAY'
+            
+            if game_response.data and len(game_response.data) > 0:
+                game_info = game_response.data[0]
+                home_team_name = game_info.get('home_team_name', 'Home Team')
+                home_team_tricode = game_info.get('home_team_tricode', 'HOME')
+                away_team_name = game_info.get('away_team_name', 'Away Team')
+                away_team_tricode = game_info.get('away_team_tricode', 'AWAY')
             
             home_players = []
             away_players = []
@@ -206,6 +222,10 @@ class LiveScores:
                 'game_id': game_id,
                 'home_players': home_players,
                 'away_players': away_players,
+                'home_team_name': home_team_name,
+                'home_team_tricode': home_team_tricode,
+                'away_team_name': away_team_name,
+                'away_team_tricode': away_team_tricode,
                 'game_status': 3,  # Historical games are final
                 'period': 4,
                 'game_clock': ''
@@ -510,10 +530,20 @@ class LiveScores:
                 except:
                     return clock_str
             
+            # Get team names from game data
+            home_team_name = game_data.get('homeTeam', {}).get('teamName', 'Home Team')
+            home_team_tricode = game_data.get('homeTeam', {}).get('teamTricode', 'HOME')
+            away_team_name = game_data.get('awayTeam', {}).get('teamName', 'Away Team')
+            away_team_tricode = game_data.get('awayTeam', {}).get('teamTricode', 'AWAY')
+            
             box_score_data = {
                 'game_id': game_id,
                 'home_players': sorted(home_players, key=lambda x: x['points'], reverse=True),
                 'away_players': sorted(away_players, key=lambda x: x['points'], reverse=True),
+                'home_team_name': home_team_name,
+                'home_team_tricode': home_team_tricode,
+                'away_team_name': away_team_name,
+                'away_team_tricode': away_team_tricode,
                 'game_status': game_data.get('gameStatus', 0),
                 'period': game_data.get('period', 0),
                 'game_clock': format_game_clock(game_data.get('gameClock', ''))

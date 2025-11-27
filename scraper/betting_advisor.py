@@ -698,10 +698,17 @@ class BettingAdvisor:
                         # Fallback: player team doesn't match either (maybe traded recently)
                         opponent_team = away_team if home_team else home_team
                 
-                # Get recent stats - fetch all needed columns
-                stats = supabase.table('daily_player_stats').select(
-                    'points, rebounds, assists, steals, blocks, turnovers, three_pointers_made'
-                ).eq('player_id', player['id']).order('game_date', desc=True).limit(5).execute()
+                # Get recent stats - fetch all needed columns including game_date and opponent
+                # Try with opponent_team first, fall back if column doesn't exist
+                try:
+                    stats = supabase.table('daily_player_stats').select(
+                        'points, rebounds, assists, steals, blocks, turnovers, three_pointers_made, game_date, opponent_team'
+                    ).eq('player_id', player['id']).order('game_date', desc=True).limit(5).execute()
+                except:
+                    # Fallback without opponent_team if column doesn't exist
+                    stats = supabase.table('daily_player_stats').select(
+                        'points, rebounds, assists, steals, blocks, turnovers, three_pointers_made, game_date'
+                    ).eq('player_id', player['id']).order('game_date', desc=True).limit(5).execute()
                 
                 if stats.data and len(stats.data) >= 3:
                     import numpy as np
@@ -717,16 +724,21 @@ class BettingAdvisor:
                         
                         # Calculate stat values (handle combo props)
                         if prop_type == 'points_rebounds_assists':
-                            recent_stats = [g['points'] + g['rebounds'] + g['assists'] for g in stats.data]
+                            recent_stats = [g['points'] + g['rebounds'] + g['assists'] for g in stats.data if all(k in g for k in ['points', 'rebounds', 'assists'])]
                         elif prop_type == 'points_rebounds':
-                            recent_stats = [g['points'] + g['rebounds'] for g in stats.data]
+                            recent_stats = [g['points'] + g['rebounds'] for g in stats.data if all(k in g for k in ['points', 'rebounds'])]
                         elif prop_type == 'points_assists':
-                            recent_stats = [g['points'] + g['assists'] for g in stats.data]
+                            recent_stats = [g['points'] + g['assists'] for g in stats.data if all(k in g for k in ['points', 'assists'])]
                         elif prop_type == 'rebounds_assists':
-                            recent_stats = [g['rebounds'] + g['assists'] for g in stats.data]
-                        elif db_column and db_column in stats.data[0]:
-                            recent_stats = [g[db_column] for g in stats.data if g.get(db_column) is not None]
+                            recent_stats = [g['rebounds'] + g['assists'] for g in stats.data if all(k in g for k in ['rebounds', 'assists'])]
+                        elif db_column:
+                            # Try to get stats, handling None values
+                            recent_stats = [g.get(db_column) for g in stats.data if g.get(db_column) is not None]
+                            if not recent_stats:
+                                print(f"⚠️  No data for {prop_type} ({db_column}) for {player['full_name']}")
+                                continue
                         else:
+                            print(f"⚠️  Unknown prop type: {prop_type}")
                             continue  # Skip if stat not available
                         
                         if not recent_stats or len(recent_stats) < 3:
@@ -782,6 +794,33 @@ class BettingAdvisor:
                             if consistency_data['matchup_adjusted']:
                                 enhanced_reason += f" | vs {opponent_team}: {consistency_data['matchup_avg']:.1f} avg in {consistency_data['matchup_games']} games"
                             
+                            # Format last 5 games data
+                            last_5_games = []
+                            for game in stats.data[:5]:
+                                game_stat = None
+                                if prop_type == 'points_rebounds_assists':
+                                    game_stat = game.get('points', 0) + game.get('rebounds', 0) + game.get('assists', 0)
+                                elif prop_type == 'points_rebounds':
+                                    game_stat = game.get('points', 0) + game.get('rebounds', 0)
+                                elif prop_type == 'points_assists':
+                                    game_stat = game.get('points', 0) + game.get('assists', 0)
+                                elif prop_type == 'rebounds_assists':
+                                    game_stat = game.get('rebounds', 0) + game.get('assists', 0)
+                                else:
+                                    # Single stat - use prop_type_map to get the correct column
+                                    stat_column = prop_type_map.get(prop_type)
+                                    if stat_column and stat_column in game:
+                                        game_stat = game[stat_column]
+                                
+                                if game_stat is not None:
+                                    last_5_games.append({
+                                        'date': game.get('game_date'),
+                                        'opponent': game.get('opponent_team'),
+                                        'stat': game_stat
+                                    })
+                            
+                            print(f"✅ Added last_5_games for {player['full_name']}: {last_5_games}")
+                            
                             best_pick = {
                                 'player_id': player['id'],
                                 'player_name': player['full_name'],
@@ -802,7 +841,8 @@ class BettingAdvisor:
                                 'matchup_adjusted': consistency_data['matchup_adjusted'],
                                 'opponent': opponent_team,
                                 'momentum_score': 0.5,
-                                'confidence': 0.5
+                                'confidence': 0.5,
+                                'last_5_games': last_5_games
                             }
                     
                     # Add the best pick for this player

@@ -214,10 +214,14 @@ def run_enhanced_value_index_pipeline():
             final_value_score = normalize_to_100_scale(raw_score)
             
             # Calculate confidence based on data availability
+            # Boost confidence for elite players (high stat scores are inherently reliable)
+            elite_bonus = 0.3 if stat_score > 80 else 0.15 if stat_score > 60 else 0
+            
             confidence = min(
-                (stat_consistency * 0.4) + 
-                (sentiment_volume * 0.4) + 
-                (0.2 if stat_score > 0 and sentiment_score != 0 else 0),
+                (stat_consistency * 0.3) +  # Reduced from 0.4
+                (sentiment_volume * 0.3) +  # Reduced from 0.4
+                (0.2 if stat_score > 0 and sentiment_score != 0 else 0.1) +
+                elite_bonus,  # Bonus for elite performers
                 1.0
             )
         

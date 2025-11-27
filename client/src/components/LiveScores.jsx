@@ -57,6 +57,9 @@ function LiveScores({ apiUrl }) {
   const fetchBoxScore = async (gameId) => {
     try {
       const response = await axios.get(`${apiUrl}/live/game/${gameId}`);
+      console.log('Box score data:', response.data);
+      console.log('Home team name:', response.data.home_team_name);
+      console.log('Away team name:', response.data.away_team_name);
       setBoxScore(response.data);
       setSelectedGame(gameId);
     } catch (error) {
@@ -438,7 +441,12 @@ function BoxScoreModal({ boxScore, onClose }) {
         <div className="p-4 space-y-6">
           {/* Away Team */}
           <div>
-            <h3 className="text-xl font-bold mb-3">Away Team</h3>
+            <h3 className="text-xl font-bold mb-3 flex items-center gap-2">
+              <span>{boxScore.away_team_name || boxScore.away_team_tricode || 'Away Team'}</span>
+              {boxScore.away_team_tricode && (
+                <span className="text-sm text-neutral-400 font-normal">({boxScore.away_team_tricode})</span>
+              )}
+            </h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-neutral-800">
@@ -475,7 +483,12 @@ function BoxScoreModal({ boxScore, onClose }) {
 
           {/* Home Team */}
           <div>
-            <h3 className="text-xl font-bold mb-3">Home Team</h3>
+            <h3 className="text-xl font-bold mb-3 flex items-center gap-2">
+              <span>{boxScore.home_team_name || boxScore.home_team_tricode || 'Home Team'}</span>
+              {boxScore.home_team_tricode && (
+                <span className="text-sm text-neutral-400 font-normal">({boxScore.home_team_tricode})</span>
+              )}
+            </h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-neutral-800">
