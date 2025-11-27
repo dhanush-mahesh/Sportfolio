@@ -14,6 +14,7 @@ function FantasyLineup({ apiUrl, onPlayerClick }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState(null); // Track which slot is being filled
 
   useEffect(() => {
     fetchTopPlayers();
@@ -43,6 +44,12 @@ function FantasyLineup({ apiUrl, onPlayerClick }) {
       const filtered = response.data.filter(p => 
         p.full_name.toLowerCase().includes(query.toLowerCase())
       ).slice(0, 10);
+      
+      // Debug: log first player to see available fields
+      if (filtered.length > 0) {
+        console.log('Player data structure:', filtered[0]);
+      }
+      
       setSearchResults(filtered);
     } catch (error) {
       console.error('Error searching players:', error);
@@ -51,16 +58,25 @@ function FantasyLineup({ apiUrl, onPlayerClick }) {
     }
   };
 
-  const addToLineup = (player) => {
-    const emptySlot = userLineup.findIndex(slot => slot === null);
-    if (emptySlot !== -1) {
-      const newLineup = [...userLineup];
-      newLineup[emptySlot] = player;
-      setUserLineup(newLineup);
-      setSearchQuery('');
-      setSearchResults([]);
-      setLineupGrade(null); // Reset grade when lineup changes
+  const addToLineup = (player, slotIndex = null) => {
+    const newLineup = [...userLineup];
+    
+    if (slotIndex !== null) {
+      // Add to specific slot
+      newLineup[slotIndex] = player;
+    } else {
+      // Add to first empty slot
+      const emptySlot = userLineup.findIndex(slot => slot === null);
+      if (emptySlot !== -1) {
+        newLineup[emptySlot] = player;
+      }
     }
+    
+    setUserLineup(newLineup);
+    setSearchQuery('');
+    setSearchResults([]);
+    setSelectedSlot(null);
+    setLineupGrade(null); // Reset grade when lineup changes
   };
 
   const removeFromLineup = (index) => {
@@ -166,6 +182,30 @@ function FantasyLineup({ apiUrl, onPlayerClick }) {
 
   const filledSlots = userLineup.filter(p => p !== null).length;
 
+  // Helper function to get player headshot
+  const getPlayerHeadshot = (player) => {
+    // Use headshot_url if available, otherwise construct from nba_api_id
+    if (player.headshot_url) {
+      return player.headshot_url;
+    }
+    
+    // Try different ID fields that might exist
+    const playerId = player.nba_api_id || player.nba_id || player.player_id;
+    
+    if (playerId) {
+      // NBA CDN URL
+      return `https://cdn.nba.com/headshots/nba/latest/1040x760/${playerId}.png`;
+    }
+    
+    // Fallback to a placeholder
+    return null;
+  };
+
+  // Helper to get player initials
+  const getPlayerInitials = (fullName) => {
+    return fullName.split(' ').map(n => n[0]).join('').toUpperCase();
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -178,7 +218,130 @@ function FantasyLineup({ apiUrl, onPlayerClick }) {
   }
 
   return (
-    <div className="space-y-6">
+    <>
+      {/* Player Search Modal */}
+      {selectedSlot !== null && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => {
+            setSelectedSlot(null);
+            setSearchQuery('');
+            setSearchResults([]);
+          }}
+        >
+          <div 
+            className="bg-highlight-dark rounded-2xl border border-neutral-700 max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl animate-scaleIn"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-highlight-dark border-b border-neutral-700 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-2xl font-bold">
+                    {userLineup[selectedSlot] ? 'Change Player' : 'Add Player'}
+                  </h3>
+                  <p className="text-neutral-400 text-sm mt-1">Slot {selectedSlot + 1}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedSlot(null);
+                    setSearchQuery('');
+                    setSearchResults([]);
+                  }}
+                  className="text-neutral-400 hover:text-white transition-colors p-2 hover:bg-neutral-800 rounded-lg"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Search Input */}
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    searchPlayers(e.target.value);
+                  }}
+                  placeholder="Search by player name..."
+                  className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-3 pl-10 focus:outline-none focus:border-purple-500"
+                  autoFocus
+                />
+                <svg className="w-5 h-5 text-neutral-400 absolute left-3 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                {searching && (
+                  <div className="absolute right-3 top-3">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-500"></div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Search Results */}
+            <div className="p-6 overflow-y-auto max-h-[calc(80vh-200px)]">
+              {searchResults.length > 0 ? (
+                <div className="space-y-2">
+                  {searchResults.map((player) => (
+                    <div
+                      key={player.id}
+                      onClick={() => addToLineup(player, selectedSlot)}
+                      className="bg-neutral-800 border border-neutral-700 rounded-lg p-4 cursor-pointer hover:border-purple-500 hover:bg-neutral-750 transition-all group"
+                    >
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                          <div className="relative w-14 h-14 bg-neutral-700 rounded-full overflow-hidden flex-shrink-0">
+                            <img
+                              src={getPlayerHeadshot(player)}
+                              alt={player.full_name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                console.error('Failed to load headshot for:', player.full_name);
+                                e.target.style.display = 'none';
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <div className="font-bold text-lg group-hover:text-purple-400 transition-colors">
+                              {player.full_name}
+                            </div>
+                            <div className="text-sm text-neutral-400">
+                              {player.team_name} • {player.position}
+                            </div>
+                          </div>
+                        </div>
+                        <svg className="w-6 h-6 text-neutral-600 group-hover:text-purple-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : searchQuery.length >= 2 ? (
+                <div className="text-center text-neutral-500 py-12">
+                  <svg className="w-16 h-16 mx-auto mb-4 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="font-semibold mb-1">No players found</p>
+                  <p className="text-sm">Try a different search term</p>
+                </div>
+              ) : (
+                <div className="text-center text-neutral-500 py-12">
+                  <svg className="w-16 h-16 mx-auto mb-4 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <p className="font-semibold mb-1">Search for a player</p>
+                  <p className="text-sm">Type at least 2 characters to search</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-6">
       {/* Header */}
       <div className="bg-highlight-dark rounded-lg p-6 border border-neutral-700">
         <h1 className="text-3xl font-bold flex items-center gap-2">
@@ -215,11 +378,9 @@ function FantasyLineup({ apiUrl, onPlayerClick }) {
 
       {/* Lineup Builder Tab */}
       {activeTab === 'builder' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left: Lineup Slots */}
-          <div className="lg:col-span-2 space-y-4">
-            <div className="bg-highlight-dark rounded-lg p-6 border border-neutral-700">
-              <div className="flex justify-between items-center mb-4">
+        <div className="space-y-4">
+          <div className="bg-highlight-dark rounded-lg p-6 border border-neutral-700">
+            <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold">Your Lineup</h2>
                 <div className="flex gap-2">
                   <button
@@ -234,21 +395,35 @@ function FantasyLineup({ apiUrl, onPlayerClick }) {
                     className="bg-neutral-700 text-white px-4 py-2 rounded-lg hover:bg-neutral-600"
                   >
                     Clear
-                  </button>
-                </div>
+                </button>
               </div>
+            </div>
 
-              <div className="space-y-2">
+            <div className="space-y-2">
                 {userLineup.map((player, idx) => (
                   <div
                     key={idx}
-                    className="bg-neutral-800 border border-neutral-700 rounded-lg p-4 hover:border-purple-500 transition-colors"
+                    onClick={() => !player && setSelectedSlot(idx)}
+                    className={`bg-neutral-800 border border-neutral-700 rounded-lg p-4 transition-all ${
+                      !player ? 'cursor-pointer hover:border-purple-500 hover:bg-neutral-750' : ''
+                    }`}
                   >
                     {player ? (
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center font-bold">
+                          <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center font-bold text-xs">
                             {idx + 1}
+                          </div>
+                          <div className="relative w-12 h-12 bg-neutral-700 rounded-full overflow-hidden flex-shrink-0">
+                            <img
+                              src={getPlayerHeadshot(player)}
+                              alt={player.full_name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                console.error('Failed to load headshot for:', player.full_name);
+                                e.target.style.display = 'none';
+                              }}
+                            />
                           </div>
                           <div>
                             <div className="font-bold">{player.full_name}</div>
@@ -257,28 +432,47 @@ function FantasyLineup({ apiUrl, onPlayerClick }) {
                             </div>
                           </div>
                         </div>
-                        <button
-                          onClick={() => removeFromLineup(idx)}
-                          className="text-red-400 hover:text-red-300 px-3 py-1 rounded hover:bg-red-900/20"
-                        >
-                          Remove
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedSlot(idx);
+                            }}
+                            className="text-blue-400 hover:text-blue-300 px-3 py-1 rounded hover:bg-blue-900/20"
+                          >
+                            Change
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeFromLineup(idx);
+                            }}
+                            className="text-red-400 hover:text-red-300 px-3 py-1 rounded hover:bg-red-900/20"
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-3 text-neutral-500">
-                        <div className="w-8 h-8 bg-neutral-700 rounded-full flex items-center justify-center font-bold">
-                          {idx + 1}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 text-neutral-500">
+                          <div className="w-8 h-8 bg-neutral-700 rounded-full flex items-center justify-center font-bold">
+                            {idx + 1}
+                          </div>
+                          <div>Click to add a player</div>
                         </div>
-                        <div>Empty Slot - Search for a player to add</div>
+                        <svg className="w-5 h-5 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
                       </div>
                     )}
-                  </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
+          </div>
 
-            {/* Lineup Grade */}
-            {lineupGrade && (
+          {/* Lineup Grade */}
+          {lineupGrade && (
               <div className="bg-highlight-dark rounded-lg p-6 border border-purple-700">
                 <h2 className="text-xl font-bold mb-4">Lineup Grade</h2>
                 
@@ -318,70 +512,10 @@ function FantasyLineup({ apiUrl, onPlayerClick }) {
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Right: Player Search */}
-          <div className="space-y-4">
-            <div className="bg-highlight-dark rounded-lg p-6 border border-neutral-700 sticky top-4">
-              <h2 className="text-xl font-bold mb-4">Search Players</h2>
-              
-              <div className="relative mb-4">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    searchPlayers(e.target.value);
-                  }}
-                  placeholder="Search by name..."
-                  className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-3 focus:outline-none focus:border-purple-500"
-                  disabled={filledSlots >= 8}
-                />
-                {searching && (
-                  <div className="absolute right-3 top-3">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-500"></div>
-                  </div>
-                )}
-              </div>
-
-              {filledSlots >= 8 && (
-                <div className="bg-yellow-900/20 border border-yellow-700 rounded-lg p-3 mb-4">
-                  <p className="text-sm text-yellow-400">Lineup is full! Remove a player to add another.</p>
                 </div>
               )}
-
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {searchResults.length > 0 ? (
-                  searchResults.map((player) => (
-                    <div
-                      key={player.id}
-                      onClick={() => filledSlots < 8 && addToLineup(player)}
-                      className={`bg-neutral-800 border border-neutral-700 rounded-lg p-3 ${
-                        filledSlots < 8 ? 'cursor-pointer hover:border-purple-500' : 'opacity-50 cursor-not-allowed'
-                      } transition-colors`}
-                    >
-                      <div className="font-semibold">{player.full_name}</div>
-                      <div className="text-sm text-neutral-400">
-                        {player.team_name} • {player.position}
-                      </div>
-                    </div>
-                  ))
-                ) : searchQuery.length >= 2 ? (
-                  <div className="text-center text-neutral-500 py-4">
-                    No players found
-                  </div>
-                ) : (
-                  <div className="text-center text-neutral-500 py-4">
-                    Type to search for players
-                  </div>
-                )}
-              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -420,7 +554,8 @@ function FantasyLineup({ apiUrl, onPlayerClick }) {
           )}
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
 
