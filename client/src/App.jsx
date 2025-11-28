@@ -1,15 +1,27 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import axios from 'axios'
 import PlayerList from './components/PlayerList'
 import PlayerPage from './components/PlayerPage'
-import ComparePage from './components/ComparePage'
-import AIInsights from './components/AIInsights'
-import LiveScores from './components/LiveScores'
-import Watchlist from './components/Watchlist'
-import TradeSimulator from './components/TradeSimulator'
-import ChatBot from './components/ChatBot'
-import BettingPicks from './components/BettingPicks'
-import FantasyLineup from './components/FantasyLineup'
+
+// Lazy load heavy components
+const ComparePage = lazy(() => import('./components/ComparePage'))
+const AIInsights = lazy(() => import('./components/AIInsights'))
+const LiveScores = lazy(() => import('./components/LiveScores'))
+const Watchlist = lazy(() => import('./components/Watchlist'))
+const TradeSimulator = lazy(() => import('./components/TradeSimulator'))
+const ChatBot = lazy(() => import('./components/ChatBot'))
+const BettingPicks = lazy(() => import('./components/BettingPicks'))
+const FantasyLineup = lazy(() => import('./components/FantasyLineup'))
+
+// Loading fallback
+const LoadingFallback = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
+      <p className="text-neutral-400">Loading...</p>
+    </div>
+  </div>
+)
 
 const API_URL = import.meta.env.PROD 
   ? 'https://nba-analytics-api-2sal.onrender.com'  // Production (Render subdomain)
@@ -126,39 +138,51 @@ function App() {
             onPlayerClick={(id) => setSelectedPlayerId(id)}
           />
         ) : currentView === 'simulator' ? (
-          <TradeSimulator
-            apiUrl={API_URL}
-            onPlayerClick={(id) => setSelectedPlayerId(id)}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <TradeSimulator
+              apiUrl={API_URL}
+              onPlayerClick={(id) => setSelectedPlayerId(id)}
+            />
+          </Suspense>
         ) : currentView === 'live' ? (
-          <LiveScores
-            apiUrl={API_URL}
-            onPlayerClick={(id) => setSelectedPlayerId(id)}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <LiveScores
+              apiUrl={API_URL}
+              onPlayerClick={(id) => setSelectedPlayerId(id)}
+            />
+          </Suspense>
         ) : currentView === 'ai' ? (
-          <AIInsights
-            apiUrl={API_URL}
-            onPlayerClick={(id) => setSelectedPlayerId(id)}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <AIInsights
+              apiUrl={API_URL}
+              onPlayerClick={(id) => setSelectedPlayerId(id)}
+            />
+          </Suspense>
         ) : currentView === 'betting' ? (
-          <BettingPicks
-            apiUrl={API_URL}
-            onPlayerClick={(id) => setSelectedPlayerId(id)}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <BettingPicks
+              apiUrl={API_URL}
+              onPlayerClick={(id) => setSelectedPlayerId(id)}
+            />
+          </Suspense>
         ) : currentView === 'fantasy' ? (
-          <FantasyLineup
-            apiUrl={API_URL}
-            onPlayerClick={(id) => setSelectedPlayerId(id)}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <FantasyLineup
+              apiUrl={API_URL}
+              onPlayerClick={(id) => setSelectedPlayerId(id)}
+            />
+          </Suspense>
         ) : viewingCompare ? (
-          <ComparePage 
-            playerIds={compareIds} // Pass the array directly
-            onBackClick={() => setViewingCompare(false)}
-            onClear={handleClearCompare}
-            apiUrl={API_URL}
-            allPlayers={players}
-            onReplacePlayer={handleReplacePlayer}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <ComparePage 
+              playerIds={compareIds} // Pass the array directly
+              onBackClick={() => setViewingCompare(false)}
+              onClear={handleClearCompare}
+              apiUrl={API_URL}
+              allPlayers={players}
+              onReplacePlayer={handleReplacePlayer}
+            />
+          </Suspense>
         ) : (
           <PlayerList
             allPlayers={players}

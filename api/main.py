@@ -7,6 +7,8 @@ import pandas as pd
 import datetime
 from typing import List, Optional
 from pydantic import BaseModel
+import time
+from functools import lru_cache
 
 # --- 1. SETUP & CONFIG ---
 load_dotenv()
@@ -14,6 +16,33 @@ url: str = os.environ.get("SUPABASE_URL")
 key: str = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(url, key)
 app = FastAPI()
+
+# --- CACHING SETUP ---
+# Simple in-memory cache with TTL
+_cache = {}
+_cache_ttl = {}
+
+def cached_response(key: str, ttl_seconds: int = 300):
+    """Decorator for caching API responses"""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            cache_key = f"{key}:{str(args)}:{str(kwargs)}"
+            current_time = time.time()
+            
+            # Check if cached and not expired
+            if cache_key in _cache and cache_key in _cache_ttl:
+                if current_time - _cache_ttl[cache_key] < ttl_seconds:
+                    print(f"✅ Cache hit: {cache_key}")
+                    return _cache[cache_key]
+            
+            # Cache miss or expired - fetch fresh data
+            print(f"🔄 Cache miss: {cache_key}")
+            result = func(*args, **kwargs)
+            _cache[cache_key] = result
+            _cache_ttl[cache_key] = current_time
+            return result
+        return wrapper
+    return decorator
 
 # --- 2. CORS MIDDLEWARE ---
 app.add_middleware(
@@ -34,6 +63,7 @@ def read_root():
     return {"message": "Sportfolio API is running"}
 
 @app.get("/players")
+@cached_response("players", ttl_seconds=600)  # Cache for 10 minutes
 def get_players():
     try:
         response = supabase.table('players').select(
@@ -44,6 +74,7 @@ def get_players():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/featured-players")
+@cached_response("featured", ttl_seconds=300)  # Cache for 5 minutes
 def get_featured_players():
     try:
         response = supabase.rpc('get_featured_players').execute()
