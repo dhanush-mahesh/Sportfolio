@@ -22,27 +22,20 @@ app = FastAPI()
 _cache = {}
 _cache_ttl = {}
 
-def cached_response(key: str, ttl_seconds: int = 300):
-    """Decorator for caching API responses"""
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            cache_key = f"{key}:{str(args)}:{str(kwargs)}"
-            current_time = time.time()
-            
-            # Check if cached and not expired
-            if cache_key in _cache and cache_key in _cache_ttl:
-                if current_time - _cache_ttl[cache_key] < ttl_seconds:
-                    print(f"✅ Cache hit: {cache_key}")
-                    return _cache[cache_key]
-            
-            # Cache miss or expired - fetch fresh data
-            print(f"🔄 Cache miss: {cache_key}")
-            result = func(*args, **kwargs)
-            _cache[cache_key] = result
-            _cache_ttl[cache_key] = current_time
-            return result
-        return wrapper
-    return decorator
+def get_cached(key: str, ttl_seconds: int = 300):
+    """Get cached value if exists and not expired"""
+    current_time = time.time()
+    if key in _cache and key in _cache_ttl:
+        if current_time - _cache_ttl[key] < ttl_seconds:
+            print(f"✅ Cache hit: {key}")
+            return _cache[key], True
+    return None, False
+
+def set_cache(key: str, value):
+    """Set cache value with current timestamp"""
+    _cache[key] = value
+    _cache_ttl[key] = time.time()
+    print(f"💾 Cached: {key}")
 
 # --- 2. CORS MIDDLEWARE ---
 app.add_middleware(
@@ -63,21 +56,37 @@ def read_root():
     return {"message": "Sportfolio API is running"}
 
 @app.get("/players")
-@cached_response("players", ttl_seconds=600)  # Cache for 10 minutes
 def get_players():
     try:
+        # Check cache first
+        cached_data, hit = get_cached("players", ttl_seconds=600)
+        if hit:
+            return cached_data
+        
+        # Fetch from database
         response = supabase.table('players').select(
             'id, full_name, team_name, position, headshot_url, nba_api_id'
         ).execute()
+        
+        # Cache the result
+        set_cache("players", response.data)
         return response.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/featured-players")
-@cached_response("featured", ttl_seconds=300)  # Cache for 5 minutes
 def get_featured_players():
     try:
+        # Check cache first
+        cached_data, hit = get_cached("featured", ttl_seconds=300)
+        if hit:
+            return cached_data
+        
+        # Fetch from database
         response = supabase.rpc('get_featured_players').execute()
+        
+        # Cache the result
+        set_cache("featured", response.data)
         return response.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -223,13 +232,22 @@ def get_player_enhanced_metrics(player_id: str):
 @app.get("/market-movers")
 def get_market_movers():
     try:
+        # Check cache
+        cached_data, hit = get_cached("market_movers", ttl_seconds=300)
+        if hit:
+            return cached_data
+        
         response = supabase.rpc('get_market_movers').execute()
         all_movers = response.data
         all_movers.sort(key=lambda x: x['value_change'], reverse=True)
         risers = all_movers[:5]
         fallers = all_movers[-5:]
         fallers.reverse()
-        return {"risers": risers, "fallers": fallers}
+        result = {"risers": risers, "fallers": fallers}
+        
+        # Cache result
+        set_cache("market_movers", result)
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -532,14 +550,7 @@ def get_price_forecast():
 def get_live_scores(date: str = None):
     """Get live scores for a specific date (defaults to today)"""
     try:
-        import sys
-        import os
-        sys.path.append(os.path.join(os.path.dirname(__file__), '../scraper'))
-        from live_scores import LiveScores
-        
-        live = LiveScores()
-        
-        # Parse date if provided, otherwise use today
+        # Parse date
         if date:
             try:
                 target_date = datetime.datetime.strptime(date, '%Y-%m-%d').date()
@@ -548,10 +559,21 @@ def get_live_scores(date: str = None):
         else:
             target_date = datetime.date.today()
         
-        # Use the new date-specific method
+        # Check cache (shorter TTL for live data)
+        cache_key = f"live_scores_{target_date.isoformat()}"
+        cached_data, hit = get_cached(cache_key, ttl_seconds=60)  # 1 minute cache
+        if hit:
+            return cached_data
+        
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), '../scraper'))
+        from live_scores import LiveScores
+        
+        live = LiveScores()
         games = live.get_games_by_date(target_date)
         
-        return {
+        result = {
             "date": target_date.isoformat(),
             "games_count": len(games),
             "games": games,
@@ -559,6 +581,10 @@ def get_live_scores(date: str = None):
             "completed_games": [g for g in games if g['is_final']],
             "upcoming_games": [g for g in games if not g['is_live'] and not g['is_final']]
         }
+        
+        # Cache result
+        set_cache(cache_key, result)
+        return result
     except HTTPException:
         raise
     except Exception as e:
@@ -801,6 +827,11 @@ def get_player_betting_props(player_id: str, use_real_lines: bool = False):
 def get_fantasy_lineup():
     """Get optimal fantasy lineup"""
     try:
+        # Check cache
+        cached_data, hit = get_cached("fantasy_lineup", ttl_seconds=600)
+        if hit:
+            return cached_data
+        
         import sys
         import os
         sys.path.append(os.path.join(os.path.dirname(__file__), '../scraper'))
@@ -809,10 +840,14 @@ def get_fantasy_lineup():
         optimizer = FantasyOptimizer()
         lineup = optimizer.get_optimal_lineup(limit=10)
         
-        return {
+        result = {
             "generated_at": datetime.datetime.now().isoformat(),
             "lineup": lineup
         }
+        
+        # Cache result
+        set_cache("fantasy_lineup", result)
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
