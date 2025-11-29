@@ -136,10 +136,12 @@ function App() {
             apiUrl={API_URL}
           />
         ) : currentView === 'watchlist' ? (
-          <Watchlist
-            apiUrl={API_URL}
-            onPlayerClick={(id) => setSelectedPlayerId(id)}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <Watchlist
+              apiUrl={API_URL}
+              onPlayerClick={(id) => setSelectedPlayerId(id)}
+            />
+          </Suspense>
         ) : currentView === 'simulator' ? (
           <Suspense fallback={<LoadingFallback />}>
             <TradeSimulator

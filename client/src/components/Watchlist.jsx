@@ -5,6 +5,7 @@ function Watchlist({ apiUrl, onPlayerClick }) {
   const [watchlist, setWatchlist] = useState([]);
   const [playersData, setPlayersData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     // Load watchlist from localStorage
@@ -25,22 +26,34 @@ function Watchlist({ apiUrl, onPlayerClick }) {
   const fetchWatchlistData = async () => {
     try {
       setLoading(true);
+      setError(null);
       const promises = watchlist.map(id => 
         Promise.all([
           axios.get(`${apiUrl}/player/${id}`),
           axios.get(`${apiUrl}/player/${id}/enhanced_metrics`)
-        ])
+        ]).catch(err => {
+          console.error(`Error fetching data for player ${id}:`, err);
+          return null; // Return null for failed requests
+        })
       );
       
       const results = await Promise.all(promises);
-      const data = results.map(([playerRes, metricsRes]) => ({
-        ...playerRes.data,
-        metrics: metricsRes.data
-      }));
+      const data = results
+        .filter(result => result !== null) // Filter out failed requests
+        .map(([playerRes, metricsRes]) => ({
+          ...playerRes.data,
+          metrics: metricsRes.data
+        }));
       
       setPlayersData(data);
+      
+      // If no data was fetched, show error
+      if (data.length === 0 && watchlist.length > 0) {
+        setError('Unable to load player data. Please try again.');
+      }
     } catch (error) {
       console.error('Error fetching watchlist data:', error);
+      setError('Failed to load watchlist. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -59,6 +72,22 @@ function Watchlist({ apiUrl, onPlayerClick }) {
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
           <p className="text-neutral-400">Loading watchlist...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <div className="text-6xl mb-4">⚠️</div>
+        <h2 className="text-2xl font-bold mb-2 text-red-400">Error Loading Watchlist</h2>
+        <p className="text-neutral-400 mb-4">{error}</p>
+        <button
+          onClick={fetchWatchlistData}
+          className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-500 transition-all"
+        >
+          Try Again
+        </button>
       </div>
     );
   }
