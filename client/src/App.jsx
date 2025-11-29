@@ -109,7 +109,7 @@ function App() {
                 <img 
                   src="/SportfolioLogo.png" 
                   alt="Sportfolio Logo" 
-                  className="h-10 w-32 object-contain cursor-pointer hover:opacity-80 transition-opacity"
+                  className="h-50 w-40 object-contain cursor-pointer hover:opacity-80 transition-opacity"
                   onClick={() => {
                     setCurrentView('home');
                     setViewingCompare(false);
