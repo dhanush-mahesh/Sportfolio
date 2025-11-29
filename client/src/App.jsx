@@ -101,20 +101,23 @@ function App() {
     <div className="min-h-screen w-full">
       {/* Navigation Bar */}
       {!selectedPlayerId && (
-        <nav className="bg-highlight-dark border-b border-neutral-700 sticky top-0 z-50">
+        <nav className="bg-highlight-dark border-b border-neutral-700 sticky top-0 z-50 backdrop-blur-lg bg-opacity-95">
           <div className="max-w-7xl mx-auto px-4 md:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center">
+            <div className="flex items-center justify-between">
+              {/* Logo */}
+              <div className="flex items-center py-3">
                 <img 
                   src="/SportfolioLogo.png" 
                   alt="Sportfolio Logo" 
-                  className="h-50 w-40 object-contain cursor-pointer hover:opacity-80 transition-opacity"
+                  className="h-10 w-32 object-contain cursor-pointer hover:opacity-80 transition-opacity"
                   onClick={() => {
                     setCurrentView('home');
                     setViewingCompare(false);
                   }}
                 />
               </div>
+              
+              {/* Navigation Tabs */}
               <NavigationDropdown 
                 currentView={currentView}
                 setCurrentView={setCurrentView}
@@ -228,72 +231,38 @@ function App() {
   )
 }
 
-// Navigation Dropdown Component
+// Navigation Tabs Component
 function NavigationDropdown({ currentView, setCurrentView, setViewingCompare }) {
-  const [isOpen, setIsOpen] = useState(false);
-
   const menuItems = [
-    { id: 'home', label: 'Home', icon: '' },
-    { id: 'watchlist', label: 'Watchlist', icon: '⭐' },
-    { id: 'live', label: 'Live Scores', icon: '' },
-    { id: 'simulator', label: 'Trade Simulator', icon: '' },
-    { id: 'ai', label: 'AI Insights', icon: '' },
-    { id: 'betting', label: 'Betting Picks', icon: '' },
-    { id: 'fantasy', label: 'Fantasy Lineup', icon: '' },
+    { id: 'home', label: 'Home' },
+    { id: 'watchlist', label: 'Watchlist' },
+    { id: 'live', label: 'Live Scores' },
+    { id: 'simulator', label: 'Trade Simulator' },
+    { id: 'ai', label: 'AI Insights' },
+    { id: 'betting', label: 'Betting Picks' },
+    { id: 'fantasy', label: 'Fantasy Lineup' },
   ];
-
-  const currentItem = menuItems.find(item => item.id === currentView) || menuItems[0];
 
   const handleSelect = (id) => {
     setCurrentView(id);
     setViewingCompare(false);
-    setIsOpen(false);
   };
 
   return (
-    <div className="relative">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-500 transition-colors"
-      >
-        <span>{currentItem.icon}</span>
-        <span>{currentItem.label}</span>
-        <svg 
-          className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-          fill="none" 
-          stroke="currentColor" 
-          viewBox="0 0 24 24"
+    <div className="flex items-center gap-1 overflow-x-auto">
+      {menuItems.map((item) => (
+        <button
+          key={item.id}
+          onClick={() => handleSelect(item.id)}
+          className={`px-4 py-2 font-medium text-sm whitespace-nowrap transition-all ${
+            currentView === item.id
+              ? 'text-blue-400 border-b-2 border-blue-400'
+              : 'text-neutral-400 hover:text-neutral-200 border-b-2 border-transparent hover:border-neutral-600'
+          }`}
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {isOpen && (
-        <>
-          <div 
-            className="fixed inset-0 z-10" 
-            onClick={() => setIsOpen(false)}
-          />
-          <div className="absolute right-0 mt-2 w-56 bg-highlight-dark border border-neutral-700 rounded-lg shadow-xl z-20">
-            {menuItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => handleSelect(item.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
-                  currentView === item.id
-                    ? 'bg-blue-600 text-white'
-                    : 'text-neutral-300 hover:bg-neutral-700'
-                } ${item.id === menuItems[0].id ? 'rounded-t-lg' : ''} ${
-                  item.id === menuItems[menuItems.length - 1].id ? 'rounded-b-lg' : ''
-                }`}
-              >
-                <span className="text-xl">{item.icon}</span>
-                <span className="font-semibold">{item.label}</span>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+          {item.label}
+        </button>
+      ))}
     </div>
   );
 }
