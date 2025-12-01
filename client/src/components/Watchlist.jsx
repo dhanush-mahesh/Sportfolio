@@ -158,11 +158,11 @@ function Watchlist({ apiUrl, onPlayerClick }) {
 
               {/* Player Header */}
               <div className="flex items-start gap-4 mb-6">
-                <div className="relative">
+                <div className="relative flex-shrink-0">
                   <img
                     src={player.headshot_url || '/default-player.png'}
                     alt={player.full_name}
-                    className="w-20 h-20 rounded-full border-2 border-yellow-500/50 shadow-lg"
+                    className="w-20 h-20 rounded-full border-2 border-yellow-500/50 shadow-lg object-cover object-top"
                     onError={(e) => { e.target.src = '/default-player.png'; }}
                   />
                   <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-yellow-500 rounded-full flex items-center justify-center shadow-lg">
