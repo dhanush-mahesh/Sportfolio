@@ -102,14 +102,14 @@ function App() {
       {/* Navigation Bar */}
       {!selectedPlayerId && (
         <nav className="bg-gradient-to-r from-neutral-900 via-neutral-900 to-neutral-800 border-b border-neutral-700/50 sticky top-0 z-50 backdrop-blur-xl shadow-2xl">
-          <div className="max-w-7xl mx-auto px-6 md:px-8">
-            <div className="flex items-center justify-between h-20">
+          <div className="max-w-7xl mx-auto px-3 sm:px-6 md:px-8">
+            <div className="flex items-center justify-between h-16 sm:h-20">
               {/* Logo */}
-              <div className="flex items-center group">
+              <div className="flex items-center group flex-shrink-0">
                 <img 
                   src="/SportfolioLogo.png" 
                   alt="Sportfolio Logo" 
-                  className="h-50 w-40 object-contain cursor-pointer transition-all duration-300 group-hover:scale-105 group-hover:brightness-110"
+                  className="h-10 w-28 sm:h-12 sm:w-36 md:h-14 md:w-40 object-contain cursor-pointer transition-all duration-300 group-hover:scale-105 group-hover:brightness-110"
                   onClick={() => {
                     setCurrentView('home');
                     setViewingCompare(false);
@@ -128,7 +128,7 @@ function App() {
         </nav>
       )}
 
-      <main className="max-w-7xl mx-auto p-4 md:p-8">
+      <main className="max-w-7xl mx-auto p-3 sm:p-4 md:p-8">
         {selectedPlayerId ? (
           <PlayerPage
             playerId={selectedPlayerId}
@@ -204,13 +204,13 @@ function App() {
       
       {/* Compare Bar - Only show on home page */}
       {compareIds.length > 0 && !selectedPlayerId && !viewingCompare && currentView === 'home' && (
-        <div className="sticky bottom-0 left-0 w-full bg-highlight-dark border-t-2 border-blue-500 shadow-lg p-4">
-          <div className="max-w-7xl mx-auto flex justify-between items-center">
-            <p className="text-lg font-semibold">Comparing {compareIds.length} / {COMPARE_LIMIT} players</p>
-            <div>
+        <div className="sticky bottom-0 left-0 w-full bg-highlight-dark border-t-2 border-blue-500 shadow-lg p-3 sm:p-4">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-0">
+            <p className="text-sm sm:text-lg font-semibold">Comparing {compareIds.length} / {COMPARE_LIMIT} players</p>
+            <div className="flex gap-3 w-full sm:w-auto">
               <button
                 onClick={handleClearCompare}
-                className="text-neutral-400 hover:text-white mr-4"
+                className="text-neutral-400 hover:text-white text-sm sm:text-base flex-1 sm:flex-none"
               >
                 Clear All
               </button>
@@ -218,7 +218,7 @@ function App() {
                 onClick={() => setViewingCompare(true)}
                 disabled={compareIds.length < 2}
                 className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-500
-                           disabled:bg-neutral-600 disabled:cursor-not-allowed"
+                           disabled:bg-neutral-600 disabled:cursor-not-allowed text-sm sm:text-base flex-1 sm:flex-none"
               >
                 Compare Now
               </button>
@@ -307,7 +307,7 @@ function NavigationMenu({ currentView, setCurrentView, setViewingCompare }) {
   };
 
   return (
-    <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+    <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto scrollbar-hide">
       {menuItems.map((item) => {
         const isActive = currentView === item.id;
         return (
@@ -315,9 +315,11 @@ function NavigationMenu({ currentView, setCurrentView, setViewingCompare }) {
             key={item.id}
             onClick={() => handleSelect(item.id)}
             className={`
-              group relative px-4 py-2.5 rounded-xl font-semibold text-sm whitespace-nowrap
+              group relative px-2 sm:px-3 md:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl 
+              font-semibold text-xs sm:text-sm whitespace-nowrap
               transition-all duration-300 ease-out
-              flex items-center gap-2
+              flex items-center gap-1 sm:gap-2
+              flex-shrink-0
               ${isActive 
                 ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-500/30 scale-105' 
                 : 'text-neutral-400 hover:text-white hover:bg-neutral-800/50'
@@ -329,17 +331,19 @@ function NavigationMenu({ currentView, setCurrentView, setViewingCompare }) {
               {item.icon}
             </span>
             
-            {/* Label */}
-            <span>{item.label}</span>
+            {/* Label - Hide on very small screens for some items */}
+            <span className={item.id === 'home' || item.id === 'live' || item.id === 'ai' ? '' : 'hidden xs:inline sm:inline'}>
+              {item.label}
+            </span>
             
             {/* Active indicator glow */}
             {isActive && (
-              <span className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 opacity-20 blur-xl animate-pulse"></span>
+              <span className="absolute inset-0 rounded-lg sm:rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 opacity-20 blur-xl animate-pulse"></span>
             )}
             
             {/* Hover effect */}
             {!isActive && (
-              <span className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-600/0 to-purple-600/0 group-hover:from-blue-600/10 group-hover:to-purple-600/10 transition-all duration-300"></span>
+              <span className="absolute inset-0 rounded-lg sm:rounded-xl bg-gradient-to-r from-blue-600/0 to-purple-600/0 group-hover:from-blue-600/10 group-hover:to-purple-600/10 transition-all duration-300"></span>
             )}
           </button>
         );
