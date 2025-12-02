@@ -33,7 +33,29 @@ def get_game_ids_for_yesterday():
     game_date = yesterday
     print(f"Fetching game IDs for {game_date.strftime('%Y-%m-%d')}...")
     
-    # Retry logic for timeout issues
+    # Try Live API first (more reliable in CI environments)
+    try:
+        print("  Trying Live NBA API...")
+        from nba_api.live.nba.endpoints import scoreboard as live_scoreboard
+        board = live_scoreboard.ScoreBoard()
+        games = board.games.get_dict()
+        
+        if games:
+            # Filter for yesterday's games
+            game_ids = []
+            for game in games:
+                game_date_str = game.get('gameTimeUTC', '')[:10]  # Get YYYY-MM-DD
+                if game_date_str == game_date.strftime('%Y-%m-%d'):
+                    game_ids.append(game['gameId'])
+            
+            if game_ids:
+                print(f"  Found {len(game_ids)} games via Live API")
+                return game_ids, game_date
+    except Exception as e:
+        print(f"  Live API failed: {e}")
+    
+    # Fallback to Stats API with retry logic
+    print("  Falling back to Stats API...")
     max_retries = 3
     for attempt in range(max_retries):
         try:
@@ -41,7 +63,7 @@ def get_game_ids_for_yesterday():
             scoreboard = scoreboardv2.ScoreboardV2(
                 game_date=game_date.strftime('%m/%d/%Y'), 
                 headers=headers, 
-                timeout=60  # Increased to 60 seconds
+                timeout=60
             )
             games = scoreboard.game_header.get_data_frame()
             if games.empty:
@@ -53,7 +75,7 @@ def get_game_ids_for_yesterday():
         except Exception as e:
             print(f"  Attempt {attempt + 1} failed: {e}")
             if attempt < max_retries - 1:
-                wait_time = (attempt + 1) * 10  # 10s, 20s, 30s
+                wait_time = (attempt + 1) * 10
                 print(f"  Waiting {wait_time} seconds before retry...")
                 time.sleep(wait_time)
             else:
