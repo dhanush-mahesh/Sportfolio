@@ -32,18 +32,33 @@ def get_game_ids_for_yesterday():
     yesterday = datetime.date.today() - datetime.timedelta(days=1)
     game_date = yesterday
     print(f"Fetching game IDs for {game_date.strftime('%Y-%m-%d')}...")
-    try:
-        scoreboard = scoreboardv2.ScoreboardV2(game_date=game_date.strftime('%m/%d/%Y'), headers=headers, timeout=30) # Increased timeout
-        games = scoreboard.game_header.get_data_frame()
-        if games.empty:
-            print("No games found for yesterday.")
-            return [], None
-        game_ids = games['GAME_ID'].tolist()
-        print(f"Found {len(game_ids)} game IDs.")
-        return game_ids, game_date
-    except Exception as e:
-        print(f"Error fetching scoreboard: {e}")
-        return [], None
+    
+    # Retry logic for timeout issues
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            print(f"  Attempt {attempt + 1}/{max_retries}...")
+            scoreboard = scoreboardv2.ScoreboardV2(
+                game_date=game_date.strftime('%m/%d/%Y'), 
+                headers=headers, 
+                timeout=60  # Increased to 60 seconds
+            )
+            games = scoreboard.game_header.get_data_frame()
+            if games.empty:
+                print("No games found for yesterday.")
+                return [], None
+            game_ids = games['GAME_ID'].tolist()
+            print(f"Found {len(game_ids)} game IDs.")
+            return game_ids, game_date
+        except Exception as e:
+            print(f"  Attempt {attempt + 1} failed: {e}")
+            if attempt < max_retries - 1:
+                wait_time = (attempt + 1) * 10  # 10s, 20s, 30s
+                print(f"  Waiting {wait_time} seconds before retry...")
+                time.sleep(wait_time)
+            else:
+                print(f"Error fetching scoreboard after {max_retries} attempts: {e}")
+                return [], None
 
 def get_stats_from_game_id(game_id: str, game_date: datetime.date):
     print(f"  Fetching box score for game: {game_id}")
@@ -52,7 +67,11 @@ def get_stats_from_game_id(game_id: str, game_date: datetime.date):
     season_stats_list = []
     
     try:
-        boxscore = boxscoretraditionalv3.BoxScoreTraditionalV3(game_id=game_id, headers=headers, timeout=30) # Increased timeout
+        boxscore = boxscoretraditionalv3.BoxScoreTraditionalV3(
+            game_id=game_id, 
+            headers=headers, 
+            timeout=60  # Increased to 60 seconds
+        )
         player_stats_df = boxscore.player_stats.get_data_frame()
         if player_stats_df.empty:
             print(f"  No player stats found for game {game_id}.")
