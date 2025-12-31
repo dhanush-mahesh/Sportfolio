@@ -652,76 +652,219 @@ class ChatRequest(BaseModel):
 
 @app.post("/chat")
 def chat_with_assistant(request: ChatRequest):
-    """Chat with NBA assistant powered by Gemini AI with real-time data"""
+    """Chat with NBA assistant powered by Gemini AI with real-time data access"""
     try:
         import google.generativeai as genai
         
         # Configure Gemini API
-        genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY not found in environment variables")
         
-        # Create model (using Gemini 2.5 Flash)
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        genai.configure(api_key=api_key)
         
-        # Fetch real-time data from database
-        today = datetime.date.today().isoformat()
+        # Helper function to execute tool calls
+        def execute_tool(tool_name: str, parameters: dict):
+            try:
+                if tool_name == "get_player_value":
+                    player_name = parameters.get("player_name", "")
+                    # Search for player
+                    response = supabase.table('players').select('id, full_name').ilike('full_name', f'%{player_name}%').limit(1).execute()
+                    if not response.data:
+                        return {"error": f"Player '{player_name}' not found"}
+                    
+                    player = response.data[0]
+                    player_id = player['id']
+                    
+                    # Get value metrics
+                    metrics_response = supabase.table('player_value_index').select('*').eq('player_id', player_id).order('value_date', desc=True).limit(1).execute()
+                    if not metrics_response.data:
+                        return {"error": f"No value data found for {player['full_name']}"}
+                    
+                    metrics = metrics_response.data[0]
+                    return {
+                        "player_name": player['full_name'],
+                        "value_score": round(metrics.get('value_score', 0), 2),
+                        "momentum_score": round(metrics.get('momentum_score', 0), 2),
+                        "confidence_score": round(metrics.get('confidence_score', 0), 2),
+                        "stat_component": round(metrics.get('stat_component', 0), 2),
+                        "sentiment_component": round(metrics.get('sentiment_component', 0), 2),
+                        "last_updated": metrics.get('value_date')
+                    }
+                
+                elif tool_name == "get_player_stats":
+                    player_name = parameters.get("player_name", "")
+                    response = supabase.table('players').select('id, full_name').ilike('full_name', f'%{player_name}%').limit(1).execute()
+                    if not response.data:
+                        return {"error": f"Player '{player_name}' not found"}
+                    
+                    player = response.data[0]
+                    player_id = player['id']
+                    
+                    # Get recent stats
+                    stats_response = supabase.table('daily_player_stats').select('*').eq('player_id', player_id).order('game_date', desc=True).limit(5).execute()
+                    if not stats_response.data:
+                        return {"error": f"No recent stats found for {player['full_name']}"}
+                    
+                    return {
+                        "player_name": player['full_name'],
+                        "recent_games": [
+                            {
+                                "date": stat['game_date'],
+                                "points": stat.get('points', 0),
+                                "rebounds": stat.get('rebounds', 0),
+                                "assists": stat.get('assists', 0)
+                            }
+                            for stat in stats_response.data
+                        ]
+                    }
+                
+                elif tool_name == "get_top_players":
+                    limit = parameters.get("limit", 5)
+                    response = supabase.rpc('get_featured_players').execute()
+                    return {
+                        "top_players": [
+                            {
+                                "name": p['full_name'],
+                                "value": round(p.get('latest_value', 0), 2),
+                                "team": p.get('team_name', 'Unknown')
+                            }
+                            for p in response.data[:limit]
+                        ]
+                    }
+                
+                elif tool_name == "get_market_movers":
+                    response = supabase.rpc('get_market_movers').execute()
+                    all_movers = response.data
+                    all_movers.sort(key=lambda x: x['value_change'], reverse=True)
+                    return {
+                        "top_risers": [
+                            {
+                                "name": m['full_name'],
+                                "change": round(m['value_change'], 2)
+                            }
+                            for m in all_movers[:3]
+                        ],
+                        "top_fallers": [
+                            {
+                                "name": m['full_name'],
+                                "change": round(m['value_change'], 2)
+                            }
+                            for m in all_movers[-3:][::-1]
+                        ]
+                    }
+                
+                elif tool_name == "get_todays_games":
+                    import sys
+                    sys.path.append(os.path.join(os.path.dirname(__file__), '../scraper'))
+                    from live_scores import LiveScores
+                    live = LiveScores()
+                    games = live.get_todays_games()
+                    return {
+                        "games_count": len(games),
+                        "games": [
+                            {
+                                "home": g.get('home_team', {}).get('team_name', 'Unknown'),
+                                "away": g.get('away_team', {}).get('team_name', 'Unknown'),
+                                "home_score": g.get('home_team', {}).get('score', 0),
+                                "away_score": g.get('away_team', {}).get('score', 0),
+                                "status": g.get('game_status_text', 'Unknown')
+                            }
+                            for g in games[:10]
+                        ]
+                    }
+                
+                return {"error": "Unknown tool"}
+            except Exception as e:
+                return {"error": str(e)}
         
-        # Get featured players
-        featured_response = supabase.rpc('get_featured_players').execute()
-        featured_players = featured_response.data[:5] if featured_response.data else []
+        # Define tools for function calling
+        tools = [
+            genai.protos.Tool(
+                function_declarations=[
+                    genai.protos.FunctionDeclaration(
+                        name='get_player_value',
+                        description='Get the current value index score and metrics for a specific NBA player',
+                        parameters=genai.protos.Schema(
+                            type=genai.protos.Type.OBJECT,
+                            properties={
+                                'player_name': genai.protos.Schema(
+                                    type=genai.protos.Type.STRING,
+                                    description='The full name of the NBA player (e.g., "Nikola Jokic", "LeBron James")'
+                                )
+                            },
+                            required=['player_name']
+                        )
+                    ),
+                    genai.protos.FunctionDeclaration(
+                        name='get_player_stats',
+                        description='Get recent game statistics for a specific NBA player',
+                        parameters=genai.protos.Schema(
+                            type=genai.protos.Type.OBJECT,
+                            properties={
+                                'player_name': genai.protos.Schema(
+                                    type=genai.protos.Type.STRING,
+                                    description='The full name of the NBA player'
+                                )
+                            },
+                            required=['player_name']
+                        )
+                    ),
+                    genai.protos.FunctionDeclaration(
+                        name='get_top_players',
+                        description='Get the top performing players by value index',
+                        parameters=genai.protos.Schema(
+                            type=genai.protos.Type.OBJECT,
+                            properties={
+                                'limit': genai.protos.Schema(
+                                    type=genai.protos.Type.INTEGER,
+                                    description='Number of players to return (default 5)'
+                                )
+                            }
+                        )
+                    ),
+                    genai.protos.FunctionDeclaration(
+                        name='get_market_movers',
+                        description='Get players with the biggest value changes (risers and fallers)',
+                        parameters=genai.protos.Schema(
+                            type=genai.protos.Type.OBJECT,
+                            properties={}
+                        )
+                    ),
+                    genai.protos.FunctionDeclaration(
+                        name='get_todays_games',
+                        description="Get today's NBA games and scores",
+                        parameters=genai.protos.Schema(
+                            type=genai.protos.Type.OBJECT,
+                            properties={}
+                        )
+                    )
+                ]
+            )
+        ]
         
-        # Get market movers
-        movers_response = supabase.rpc('get_market_movers').execute()
-        market_movers = movers_response.data if movers_response.data else []
+        # Create model with function calling
+        model = genai.GenerativeModel('gemini-1.5-flash', tools=tools)
         
-        # Get today's live scores
-        try:
-            import sys
-            sys.path.append(os.path.join(os.path.dirname(__file__), '../scraper'))
-            from live_scores import LiveScores
-            live = LiveScores()
-            games = live.get_todays_games()
-            live_summary = f"{len(games)} games today" if games else "No games today"
-        except:
-            live_summary = "Live scores unavailable"
-        
-        # Build enhanced context
-        context = f"""You are an NBA expert assistant for a sports trading platform called Sportfolio. 
-You help users analyze NBA players, develop trading strategies, and make informed decisions.
+        # Build context
+        context = f"""You are an NBA expert assistant for Sportfolio. You have access to real-time NBA data through function calls.
 
-CURRENT DATA (as of {today}):
+Current date: {datetime.date.today().isoformat()}
 
-Featured Players (Top Value):
-"""
-        for i, player in enumerate(featured_players[:5], 1):
-            context += f"{i}. {player.get('full_name', 'Unknown')} - Value: {player.get('latest_value', 0):.1f}, "
-            context += f"Momentum: {player.get('momentum_status', 'N/A')}\n"
-        
-        context += f"\nMarket Activity:\n"
-        if market_movers:
-            risers = [m for m in market_movers if m.get('value_change', 0) > 0][:3]
-            fallers = [m for m in market_movers if m.get('value_change', 0) < 0][:3]
-            
-            if risers:
-                context += "Top Risers: " + ", ".join([f"{m.get('full_name')} (+{m.get('value_change', 0):.1f})" for m in risers]) + "\n"
-            if fallers:
-                context += "Top Fallers: " + ", ".join([f"{m.get('full_name')} ({m.get('value_change', 0):.1f})" for m in fallers]) + "\n"
-        
-        context += f"\nLive Games: {live_summary}\n"
-        
-        context += """
-PLATFORM FEATURES:
-- Watchlist: Users can save favorite players
-- Trade Simulator: Build and analyze portfolios
-- AI Insights: Buy/sell recommendations, breakout candidates
-- Live Scores: Real-time NBA game data
-- Value Index: Player value scores based on stats + sentiment
+IMPORTANT: When users ask about specific players, stats, or games, ALWAYS use the available functions to get accurate real-time data from the database. DO NOT make up information or tell users to search manually.
+
+AVAILABLE FUNCTIONS:
+- get_player_value: Get a player's value index score and metrics
+- get_player_stats: Get recent game statistics for a player
+- get_top_players: Get top performing players by value
+- get_market_movers: Get biggest risers and fallers
+- get_todays_games: Get today's NBA games and scores
 
 GUIDELINES:
-- Provide specific, actionable advice
-- Reference actual player data when available
-- Suggest using platform features (watchlist, simulator, etc.)
-- Keep responses concise (2-3 paragraphs max)
-- Use trading terminology (buy low, sell high, momentum, etc.)
+- Always call functions to get real data when asked about players or stats
+- Provide specific numbers and metrics from the function results
+- Keep responses concise and actionable
+- Use trading terminology when appropriate
 
 """
         
@@ -731,10 +874,53 @@ GUIDELINES:
             context += f"{role}: {msg['content']}\n"
         
         # Add current message
-        context += f"User: {request.message}\nAssistant:"
+        context += f"User: {request.message}\n"
         
-        # Generate response
-        response = model.generate_content(context)
+        # Generate response with function calling
+        chat = model.start_chat()
+        response = chat.send_message(context)
+        
+        # Check if model wants to call functions
+        max_iterations = 5
+        iteration = 0
+        
+        while iteration < max_iterations:
+            try:
+                if (response.candidates and 
+                    len(response.candidates) > 0 and 
+                    response.candidates[0].content.parts and
+                    len(response.candidates[0].content.parts) > 0):
+                    
+                    part = response.candidates[0].content.parts[0]
+                    
+                    # Check if there's a function call
+                    if hasattr(part, 'function_call') and part.function_call:
+                        function_call = part.function_call
+                        tool_name = function_call.name
+                        tool_params = {k: v for k, v in function_call.args.items()}
+                        
+                        # Execute the function
+                        tool_result = execute_tool(tool_name, tool_params)
+                        
+                        # Send result back to model
+                        response = chat.send_message(
+                            genai.protos.Content(
+                                parts=[genai.protos.Part(
+                                    function_response=genai.protos.FunctionResponse(
+                                        name=tool_name,
+                                        response={"result": tool_result}
+                                    )
+                                )]
+                            )
+                        )
+                        iteration += 1
+                        continue
+                    else:
+                        # No function call, we have the final response
+                        break
+            except AttributeError:
+                # No function call attribute, use text response
+                break
         
         return {
             "response": response.text,

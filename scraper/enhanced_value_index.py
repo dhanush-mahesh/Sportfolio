@@ -53,6 +53,11 @@ def get_stat_trend(player_id, start_date):
         # Calculate fantasy scores for each game
         fantasy_scores = [calculate_fantasy_score(game) for game in response.data]
         
+        # Filter out any NaN values
+        fantasy_scores = [s for s in fantasy_scores if np.isfinite(s)]
+        if not fantasy_scores:
+            return 0, 0, 0
+        
         # Weighted average (more recent games weighted higher)
         weights = np.exp(np.linspace(0, 1, len(fantasy_scores)))
         weighted_avg = np.average(fantasy_scores, weights=weights)
@@ -66,7 +71,13 @@ def get_stat_trend(player_id, start_date):
             trend = 0
         
         # Calculate consistency (lower std dev = more consistent)
-        consistency = 1 / (1 + np.std(fantasy_scores))
+        std_dev = np.std(fantasy_scores)
+        consistency = 1 / (1 + std_dev) if np.isfinite(std_dev) else 0
+        
+        # Ensure all values are finite
+        weighted_avg = weighted_avg if np.isfinite(weighted_avg) else 0
+        trend = trend if np.isfinite(trend) else 0
+        consistency = consistency if np.isfinite(consistency) else 0
         
         return weighted_avg, trend, consistency
         
@@ -108,6 +119,10 @@ def get_sentiment_trend(player_id, start_date):
             source = item.get('source', 'unknown')
             score = item['sentiment_score']
             
+            # Skip invalid scores
+            if not np.isfinite(score):
+                continue
+            
             # Get base weight for source
             weight = 1.0
             for key, val in source_weights.items():
@@ -117,6 +132,9 @@ def get_sentiment_trend(player_id, start_date):
             
             weighted_scores.append(score * weight)
             dates.append(item['article_date'])
+        
+        if not weighted_scores:
+            return 0, 0, 0
         
         # Calculate weighted average
         avg_sentiment = np.mean(weighted_scores)
@@ -131,6 +149,11 @@ def get_sentiment_trend(player_id, start_date):
         
         # Volume (more mentions = more confidence in sentiment)
         volume = min(len(weighted_scores) / 20, 1.0)  # Normalize to 0-1
+        
+        # Ensure all values are finite
+        avg_sentiment = avg_sentiment if np.isfinite(avg_sentiment) else 0
+        trend = trend if np.isfinite(trend) else 0
+        volume = volume if np.isfinite(volume) else 0
         
         return avg_sentiment, trend, volume
         
@@ -150,8 +173,17 @@ def calculate_momentum_score(stat_trend, sentiment_trend):
 
 def normalize_to_100_scale(value, min_val=-50, max_val=50):
     """Normalize a value to 0-100 scale"""
+    # Handle NaN and Infinity
+    if not np.isfinite(value):
+        return 50.0
     normalized = ((value - min_val) / (max_val - min_val)) * 100
     return max(0, min(100, normalized))
+
+def safe_float(value, default=0.0):
+    """Convert value to safe float, replacing NaN/Inf with default"""
+    if not np.isfinite(value):
+        return default
+    return float(value)
 
 # --- 3. MAIN EXECUTION ---
 
@@ -234,11 +266,11 @@ def run_enhanced_value_index_pipeline():
         value_index_to_insert.append({
             "player_id": player_id,
             "value_date": today.isoformat(),
-            "value_score": round(final_value_score, 2),
-            "stat_component": round(stat_score, 2),
-            "sentiment_component": round(sentiment_score, 3),
-            "momentum_score": round(momentum, 3),
-            "confidence_score": round(confidence, 3)
+            "value_score": safe_float(final_value_score, 50.0),
+            "stat_component": safe_float(stat_score, 0.0),
+            "sentiment_component": safe_float(sentiment_score, 0.0),
+            "momentum_score": safe_float(momentum, 0.0),
+            "confidence_score": safe_float(confidence, 0.0)
         })
 
     # Insert all new value scores
