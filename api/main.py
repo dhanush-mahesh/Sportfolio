@@ -656,64 +656,12 @@ class ChatRequest(BaseModel):
 
 @app.post("/chat")
 def chat_with_assistant(request: ChatRequest):
-    """Chat with NBA assistant powered by Gemini AI"""
-    try:
-        import google.generativeai as genai
-        
-        # Configure Gemini API
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY not found in environment variables")
-        
-        genai.configure(api_key=api_key)
-        
-        # Use simple model without function calling to save quota
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        
-        # Build simple context
-        context = f"""You are an NBA expert assistant for Sportfolio. 
-        
-Current date: {datetime.date.today().isoformat()}
-
-Provide helpful NBA insights and analysis. Keep responses concise.
-
-"""
-        
-        # Add conversation history
-        for msg in request.history[-6:]:
-            role = "User" if msg['role'] == 'user' else "Assistant"
-            context += f"{role}: {msg['content']}\n"
-        
-        # Add current message
-        context += f"User: {request.message}\n"
-        
-        # Generate simple response
-        response = model.generate_content(context)
-        
-        return {
-            "response": response.text,
-            "success": True
-        }
-        
-    except Exception as e:
-        print(f"Chat error: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        # Check if it's a quota error
-        error_str = str(e).lower()
-        if 'quota' in error_str or '429' in error_str:
-            return {
-                "response": "I've reached my API limit for now. Please try again in a few minutes, or the developer can upgrade the API plan.",
-                "success": False,
-                "error": "quota_exceeded"
-            }
-        
-        return {
-            "response": "I'm having trouble connecting right now. Please try again in a moment.",
-            "success": False,
-            "error": str(e)
-        }
+    """Chat with NBA assistant - currently unavailable due to API issues"""
+    return {
+        "response": "The AI chatbot is temporarily unavailable due to API configuration issues. Please check back later, or contact the developer to configure a working AI model.",
+        "success": False,
+        "error": "chatbot_disabled"
+    }
 
 # Cache for betting picks (2 minute TTL)
 _betting_picks_cache = {
