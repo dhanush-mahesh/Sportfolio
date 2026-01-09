@@ -648,11 +648,15 @@ def get_top_performers():
 
 class ChatRequest(BaseModel):
     message: str
+# --- CHATBOT ENDPOINT ---
+
+class ChatRequest(BaseModel):
+    message: str
     history: List[dict] = []
 
 @app.post("/chat")
 def chat_with_assistant(request: ChatRequest):
-    """Chat with NBA assistant powered by Gemini AI with real-time data access"""
+    """Chat with NBA assistant powered by Gemini AI"""
     try:
         import google.generativeai as genai
         
@@ -663,208 +667,15 @@ def chat_with_assistant(request: ChatRequest):
         
         genai.configure(api_key=api_key)
         
-        # Helper function to execute tool calls
-        def execute_tool(tool_name: str, parameters: dict):
-            try:
-                if tool_name == "get_player_value":
-                    player_name = parameters.get("player_name", "")
-                    # Search for player
-                    response = supabase.table('players').select('id, full_name').ilike('full_name', f'%{player_name}%').limit(1).execute()
-                    if not response.data:
-                        return {"error": f"Player '{player_name}' not found"}
-                    
-                    player = response.data[0]
-                    player_id = player['id']
-                    
-                    # Get value metrics
-                    metrics_response = supabase.table('player_value_index').select('*').eq('player_id', player_id).order('value_date', desc=True).limit(1).execute()
-                    if not metrics_response.data:
-                        return {"error": f"No value data found for {player['full_name']}"}
-                    
-                    metrics = metrics_response.data[0]
-                    return {
-                        "player_name": player['full_name'],
-                        "value_score": round(metrics.get('value_score', 0), 2),
-                        "momentum_score": round(metrics.get('momentum_score', 0), 2),
-                        "confidence_score": round(metrics.get('confidence_score', 0), 2),
-                        "stat_component": round(metrics.get('stat_component', 0), 2),
-                        "sentiment_component": round(metrics.get('sentiment_component', 0), 2),
-                        "last_updated": metrics.get('value_date')
-                    }
-                
-                elif tool_name == "get_player_stats":
-                    player_name = parameters.get("player_name", "")
-                    response = supabase.table('players').select('id, full_name').ilike('full_name', f'%{player_name}%').limit(1).execute()
-                    if not response.data:
-                        return {"error": f"Player '{player_name}' not found"}
-                    
-                    player = response.data[0]
-                    player_id = player['id']
-                    
-                    # Get recent stats
-                    stats_response = supabase.table('daily_player_stats').select('*').eq('player_id', player_id).order('game_date', desc=True).limit(5).execute()
-                    if not stats_response.data:
-                        return {"error": f"No recent stats found for {player['full_name']}"}
-                    
-                    return {
-                        "player_name": player['full_name'],
-                        "recent_games": [
-                            {
-                                "date": stat['game_date'],
-                                "points": stat.get('points', 0),
-                                "rebounds": stat.get('rebounds', 0),
-                                "assists": stat.get('assists', 0)
-                            }
-                            for stat in stats_response.data
-                        ]
-                    }
-                
-                elif tool_name == "get_top_players":
-                    limit = parameters.get("limit", 5)
-                    response = supabase.rpc('get_featured_players').execute()
-                    return {
-                        "top_players": [
-                            {
-                                "name": p['full_name'],
-                                "value": round(p.get('latest_value', 0), 2),
-                                "team": p.get('team_name', 'Unknown')
-                            }
-                            for p in response.data[:limit]
-                        ]
-                    }
-                
-                elif tool_name == "get_market_movers":
-                    response = supabase.rpc('get_market_movers').execute()
-                    all_movers = response.data
-                    all_movers.sort(key=lambda x: x['value_change'], reverse=True)
-                    return {
-                        "top_risers": [
-                            {
-                                "name": m['full_name'],
-                                "change": round(m['value_change'], 2)
-                            }
-                            for m in all_movers[:3]
-                        ],
-                        "top_fallers": [
-                            {
-                                "name": m['full_name'],
-                                "change": round(m['value_change'], 2)
-                            }
-                            for m in all_movers[-3:][::-1]
-                        ]
-                    }
-                
-                elif tool_name == "get_todays_games":
-                    import sys
-                    sys.path.append(os.path.join(os.path.dirname(__file__), '../scraper'))
-                    from live_scores import LiveScores
-                    live = LiveScores()
-                    games = live.get_todays_games()
-                    return {
-                        "games_count": len(games),
-                        "games": [
-                            {
-                                "home": g.get('home_team', {}).get('team_name', 'Unknown'),
-                                "away": g.get('away_team', {}).get('team_name', 'Unknown'),
-                                "home_score": g.get('home_team', {}).get('score', 0),
-                                "away_score": g.get('away_team', {}).get('score', 0),
-                                "status": g.get('game_status_text', 'Unknown')
-                            }
-                            for g in games[:10]
-                        ]
-                    }
-                
-                return {"error": "Unknown tool"}
-            except Exception as e:
-                return {"error": str(e)}
+        # Use simple model without function calling to save quota
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
-        # Define tools for function calling
-        tools = [
-            genai.protos.Tool(
-                function_declarations=[
-                    genai.protos.FunctionDeclaration(
-                        name='get_player_value',
-                        description='Get the current value index score and metrics for a specific NBA player',
-                        parameters=genai.protos.Schema(
-                            type=genai.protos.Type.OBJECT,
-                            properties={
-                                'player_name': genai.protos.Schema(
-                                    type=genai.protos.Type.STRING,
-                                    description='The full name of the NBA player (e.g., "Nikola Jokic", "LeBron James")'
-                                )
-                            },
-                            required=['player_name']
-                        )
-                    ),
-                    genai.protos.FunctionDeclaration(
-                        name='get_player_stats',
-                        description='Get recent game statistics for a specific NBA player',
-                        parameters=genai.protos.Schema(
-                            type=genai.protos.Type.OBJECT,
-                            properties={
-                                'player_name': genai.protos.Schema(
-                                    type=genai.protos.Type.STRING,
-                                    description='The full name of the NBA player'
-                                )
-                            },
-                            required=['player_name']
-                        )
-                    ),
-                    genai.protos.FunctionDeclaration(
-                        name='get_top_players',
-                        description='Get the top performing players by value index',
-                        parameters=genai.protos.Schema(
-                            type=genai.protos.Type.OBJECT,
-                            properties={
-                                'limit': genai.protos.Schema(
-                                    type=genai.protos.Type.INTEGER,
-                                    description='Number of players to return (default 5)'
-                                )
-                            }
-                        )
-                    ),
-                    genai.protos.FunctionDeclaration(
-                        name='get_market_movers',
-                        description='Get players with the biggest value changes (risers and fallers)',
-                        parameters=genai.protos.Schema(
-                            type=genai.protos.Type.OBJECT,
-                            properties={}
-                        )
-                    ),
-                    genai.protos.FunctionDeclaration(
-                        name='get_todays_games',
-                        description="Get today's NBA games and scores",
-                        parameters=genai.protos.Schema(
-                            type=genai.protos.Type.OBJECT,
-                            properties={}
-                        )
-                    )
-                ]
-            )
-        ]
+        # Build simple context
+        context = f"""You are an NBA expert assistant for Sportfolio. 
         
-        # Create model with function calling
-        model = genai.GenerativeModel('gemini-1.5-flash', tools=tools)
-        
-        # Build context
-        context = f"""You are an NBA expert assistant for Sportfolio. You have access to real-time NBA data through function calls.
-
 Current date: {datetime.date.today().isoformat()}
 
-IMPORTANT: When users ask about specific players, stats, or games, ALWAYS use the available functions to get accurate real-time data from the database. DO NOT make up information or tell users to search manually.
-
-AVAILABLE FUNCTIONS:
-- get_player_value: Get a player's value index score and metrics
-- get_player_stats: Get recent game statistics for a player
-- get_top_players: Get top performing players by value
-- get_market_movers: Get biggest risers and fallers
-- get_todays_games: Get today's NBA games and scores
-
-GUIDELINES:
-- Always call functions to get real data when asked about players or stats
-- Provide specific numbers and metrics from the function results
-- Keep responses concise and actionable
-- Use trading terminology when appropriate
+Provide helpful NBA insights and analysis. Keep responses concise.
 
 """
         
@@ -876,51 +687,8 @@ GUIDELINES:
         # Add current message
         context += f"User: {request.message}\n"
         
-        # Generate response with function calling
-        chat = model.start_chat()
-        response = chat.send_message(context)
-        
-        # Check if model wants to call functions
-        max_iterations = 5
-        iteration = 0
-        
-        while iteration < max_iterations:
-            try:
-                if (response.candidates and 
-                    len(response.candidates) > 0 and 
-                    response.candidates[0].content.parts and
-                    len(response.candidates[0].content.parts) > 0):
-                    
-                    part = response.candidates[0].content.parts[0]
-                    
-                    # Check if there's a function call
-                    if hasattr(part, 'function_call') and part.function_call:
-                        function_call = part.function_call
-                        tool_name = function_call.name
-                        tool_params = {k: v for k, v in function_call.args.items()}
-                        
-                        # Execute the function
-                        tool_result = execute_tool(tool_name, tool_params)
-                        
-                        # Send result back to model
-                        response = chat.send_message(
-                            genai.protos.Content(
-                                parts=[genai.protos.Part(
-                                    function_response=genai.protos.FunctionResponse(
-                                        name=tool_name,
-                                        response={"result": tool_result}
-                                    )
-                                )]
-                            )
-                        )
-                        iteration += 1
-                        continue
-                    else:
-                        # No function call, we have the final response
-                        break
-            except AttributeError:
-                # No function call attribute, use text response
-                break
+        # Generate simple response
+        response = model.generate_content(context)
         
         return {
             "response": response.text,
@@ -931,13 +699,21 @@ GUIDELINES:
         print(f"Chat error: {e}")
         import traceback
         traceback.print_exc()
+        
+        # Check if it's a quota error
+        error_str = str(e).lower()
+        if 'quota' in error_str or '429' in error_str:
+            return {
+                "response": "I've reached my API limit for now. Please try again in a few minutes, or the developer can upgrade the API plan.",
+                "success": False,
+                "error": "quota_exceeded"
+            }
+        
         return {
             "response": "I'm having trouble connecting right now. Please try again in a moment.",
             "success": False,
             "error": str(e)
         }
-
-# --- BETTING ADVISOR ENDPOINTS ---
 
 # Cache for betting picks (2 minute TTL)
 _betting_picks_cache = {
