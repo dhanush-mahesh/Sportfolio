@@ -105,9 +105,12 @@ function LiveScores({ apiUrl }) {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent mb-2 flex items-center gap-3">
-                <svg className="w-10 h-10 text-orange-500" fill="currentColor" viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-                  <path d="M12 2 L12 22 M2 12 L22 12 M5 5 L19 19 M19 5 L5 19" stroke="currentColor" strokeWidth="0.5"/>
+                <svg className="w-10 h-10 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                  <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="2" fill="none"/>
+                  <line x1="3" y1="9" x2="21" y2="9" stroke="currentColor" strokeWidth="2"/>
+                  <text x="7" y="15" fontSize="8" fill="currentColor" fontWeight="bold">00</text>
+                  <text x="15" y="15" fontSize="8" fill="currentColor" fontWeight="bold">00</text>
+                  <line x1="12" y1="9" x2="12" y2="20" stroke="currentColor" strokeWidth="1.5"/>
                 </svg>
                 Live Scores
               </h1>
