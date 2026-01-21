@@ -36,6 +36,15 @@ function App() {
   const [currentView, setCurrentView] = useState('home')
   const [compareIds, setCompareIds] = useState([])
   const [viewingCompare, setViewingCompare] = useState(false)
+  const [isTransitioning, setIsTransitioning] = useState(false)
+  
+  // Cache for heavy data
+  const [cachedData, setCachedData] = useState({
+    aiInsights: null,
+    bettingPicks: null,
+    fantasyLineup: null,
+    liveScores: null
+  })
 
   useEffect(() => {
     async function fetchInitialData() {
@@ -97,6 +106,20 @@ function App() {
     setViewingCompare(false)
   }
 
+  // Handle view changes with loading state
+  const handleViewChange = (view) => {
+    setIsTransitioning(true)
+    setCurrentView(view)
+    setViewingCompare(false)
+    // Reset transition after a short delay
+    setTimeout(() => setIsTransitioning(false), 300)
+  }
+
+  // Update cache when data is loaded
+  const updateCache = (key, data) => {
+    setCachedData(prev => ({ ...prev, [key]: data }))
+  }
+
   return (
     <div className="min-h-screen w-full">
       {/* Navigation Bar */}
@@ -120,8 +143,9 @@ function App() {
               {/* Navigation Tabs */}
               <NavigationMenu 
                 currentView={currentView}
-                setCurrentView={setCurrentView}
+                setCurrentView={handleViewChange}
                 setViewingCompare={setViewingCompare}
+                cachedViews={Object.keys(cachedData).filter(key => cachedData[key] !== null)}
               />
             </div>
           </div>
@@ -129,6 +153,16 @@ function App() {
       )}
 
       <main className="max-w-7xl mx-auto p-3 sm:p-4 md:p-8">
+        {/* Transition Loading Overlay */}
+        {isTransitioning && (
+          <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/20 backdrop-blur-sm">
+            <div className="bg-highlight-dark rounded-2xl p-8 border border-neutral-700 shadow-2xl">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-3"></div>
+              <p className="text-neutral-400 text-sm">Loading...</p>
+            </div>
+          </div>
+        )}
+        
         {selectedPlayerId ? (
           <PlayerPage
             playerId={selectedPlayerId}
@@ -161,6 +195,8 @@ function App() {
             <AIInsights
               apiUrl={API_URL}
               onPlayerClick={(id) => setSelectedPlayerId(id)}
+              cachedData={cachedData.aiInsights}
+              onDataLoaded={(data) => updateCache('aiInsights', data)}
             />
           </Suspense>
         ) : currentView === 'betting' ? (
@@ -168,6 +204,8 @@ function App() {
             <BettingPicks
               apiUrl={API_URL}
               onPlayerClick={(id) => setSelectedPlayerId(id)}
+              cachedData={cachedData.bettingPicks}
+              onDataLoaded={(data) => updateCache('bettingPicks', data)}
             />
           </Suspense>
         ) : currentView === 'fantasy' ? (
@@ -175,6 +213,8 @@ function App() {
             <FantasyLineup
               apiUrl={API_URL}
               onPlayerClick={(id) => setSelectedPlayerId(id)}
+              cachedData={cachedData.fantasyLineup}
+              onDataLoaded={(data) => updateCache('fantasyLineup', data)}
             />
           </Suspense>
         ) : viewingCompare ? (
@@ -234,7 +274,7 @@ function App() {
 }
 
 // Navigation Menu Component - Modern & Professional
-function NavigationMenu({ currentView, setCurrentView, setViewingCompare }) {
+function NavigationMenu({ currentView, setCurrentView, setViewingCompare, cachedViews = [] }) {
   const menuItems = [
     { 
       id: 'home', 
@@ -310,6 +350,7 @@ function NavigationMenu({ currentView, setCurrentView, setViewingCompare }) {
     <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto scrollbar-hide">
       {menuItems.map((item) => {
         const isActive = currentView === item.id;
+        const isCached = cachedViews.includes(item.id);
         return (
           <button
             key={item.id}
@@ -335,6 +376,11 @@ function NavigationMenu({ currentView, setCurrentView, setViewingCompare }) {
             <span className={item.id === 'home' || item.id === 'live' || item.id === 'ai' ? '' : 'hidden xs:inline sm:inline'}>
               {item.label}
             </span>
+            
+            {/* Cached indicator - small green dot */}
+            {isCached && !isActive && (
+              <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+            )}
             
             {/* Active indicator glow */}
             {isActive && (

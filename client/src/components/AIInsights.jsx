@@ -1,14 +1,20 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 
-function AIInsights({ apiUrl, onPlayerClick }) {
-  const [insights, setInsights] = useState(null);
-  const [loading, setLoading] = useState(true);
+function AIInsights({ apiUrl, onPlayerClick, cachedData, onDataLoaded }) {
+  const [insights, setInsights] = useState(cachedData || null);
+  const [loading, setLoading] = useState(!cachedData);
   const [activeTab, setActiveTab] = useState('overview');
   const [priceForecast, setPriceForecast] = useState(null);
 
   useEffect(() => {
-    fetchInsights();
+    // If we have cached data, use it immediately
+    if (cachedData) {
+      setInsights(cachedData);
+      setLoading(false);
+    } else {
+      fetchInsights();
+    }
     // Don't fetch price forecast on initial load - only when predictions tab is clicked
   }, []);
 
@@ -24,6 +30,10 @@ function AIInsights({ apiUrl, onPlayerClick }) {
       setLoading(true);
       const response = await axios.get(`${apiUrl}/ai/daily-insights`);
       setInsights(response.data);
+      // Cache the data in parent
+      if (onDataLoaded) {
+        onDataLoaded(response.data);
+      }
     } catch (error) {
       console.error('Error fetching AI insights:', error);
     } finally {

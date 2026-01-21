@@ -1,13 +1,19 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 
-function BettingPicks({ apiUrl }) {
-  const [picks, setPicks] = useState([]);
-  const [loading, setLoading] = useState(true);
+function BettingPicks({ apiUrl, cachedData, onDataLoaded }) {
+  const [picks, setPicks] = useState(cachedData || []);
+  const [loading, setLoading] = useState(!cachedData);
   const [modalPick, setModalPick] = useState(null);
 
   useEffect(() => {
-    fetchBettingPicks();
+    // If we have cached data, use it immediately
+    if (cachedData) {
+      setPicks(cachedData);
+      setLoading(false);
+    } else {
+      fetchBettingPicks();
+    }
   }, []);
 
   const fetchBettingPicks = async () => {
@@ -16,7 +22,7 @@ function BettingPicks({ apiUrl }) {
       const response = await axios.get(`${apiUrl}/betting/picks`, {
         params: { 
           todays_games: true, 
-          force_refresh: true,
+          force_refresh: false, // Changed to false to allow caching
           _t: Date.now() // Cache buster
         }
       });
@@ -25,6 +31,10 @@ function BettingPicks({ apiUrl }) {
       console.log('First pick has last_5_games?', !!response.data.picks?.[0]?.last_5_games);
       console.log('First pick last_5_games:', response.data.picks?.[0]?.last_5_games);
       setPicks(response.data.picks || []);
+      // Cache the data in parent
+      if (onDataLoaded) {
+        onDataLoaded(response.data.picks || []);
+      }
     } catch (error) {
       console.error('Error fetching betting picks:', error);
     } finally {
