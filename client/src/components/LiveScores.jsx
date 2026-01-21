@@ -9,6 +9,8 @@ function LiveScores({ apiUrl }) {
   const [selectedGame, setSelectedGame] = useState(null);
   const [boxScore, setBoxScore] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [loadingBoxScore, setLoadingBoxScore] = useState(false);
+  const [boxScoreError, setBoxScoreError] = useState(null);
 
   useEffect(() => {
     fetchScores();
@@ -55,15 +57,21 @@ function LiveScores({ apiUrl }) {
   };
 
   const fetchBoxScore = async (gameId) => {
+    setLoadingBoxScore(true);
+    setBoxScoreError(null);
+    setSelectedGame(gameId);
+    
     try {
       const response = await axios.get(`${apiUrl}/live/game/${gameId}`);
       console.log('Box score data:', response.data);
       console.log('Home team name:', response.data.home_team_name);
       console.log('Away team name:', response.data.away_team_name);
       setBoxScore(response.data);
-      setSelectedGame(gameId);
     } catch (error) {
       console.error('Error fetching box score:', error);
+      setBoxScoreError('Failed to load box score. Please try again.');
+    } finally {
+      setLoadingBoxScore(false);
     }
   };
 
@@ -189,6 +197,7 @@ function LiveScores({ apiUrl }) {
                 key={game.game_id} 
                 game={game} 
                 onViewDetails={() => fetchBoxScore(game.game_id)}
+                isLoading={loadingBoxScore && selectedGame === game.game_id}
               />
             ))}
           </div>
@@ -210,6 +219,7 @@ function LiveScores({ apiUrl }) {
                 key={game.game_id} 
                 game={game}
                 onViewDetails={() => fetchBoxScore(game.game_id)}
+                isLoading={loadingBoxScore && selectedGame === game.game_id}
               />
             ))}
           </div>
@@ -251,20 +261,24 @@ function LiveScores({ apiUrl }) {
       )}
 
       {/* Box Score Modal */}
-      {boxScore && (
+      {selectedGame && (
         <BoxScoreModal 
-          boxScore={boxScore} 
+          boxScore={boxScore}
+          loading={loadingBoxScore}
+          error={boxScoreError}
           onClose={() => {
             setBoxScore(null);
             setSelectedGame(null);
+            setBoxScoreError(null);
           }}
+          onRetry={() => fetchBoxScore(selectedGame)}
         />
       )}
     </div>
   );
 }
 
-function GameCard({ game, onViewDetails }) {
+function GameCard({ game, onViewDetails, isLoading }) {
   const awayWinning = game.away_team.score > game.home_team.score;
   const homeWinning = game.home_team.score > game.away_team.score;
 
@@ -360,12 +374,25 @@ function GameCard({ game, onViewDetails }) {
         {(game.is_live || game.is_final) && onViewDetails && (
           <button
             onClick={onViewDetails}
-            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white py-3 rounded-xl transition-all text-sm font-semibold shadow-lg hover:shadow-xl hover:scale-105 flex items-center justify-center gap-2"
+            disabled={isLoading}
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white py-3 rounded-xl transition-all text-sm font-semibold shadow-lg hover:shadow-xl hover:scale-105 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            View Box Score
+            {isLoading ? (
+              <>
+                <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Loading...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                View Box Score
+              </>
+            )}
           </button>
         )}
       </div>
@@ -424,7 +451,7 @@ function PerformerCard({ player, rank }) {
   );
 }
 
-function BoxScoreModal({ boxScore, onClose }) {
+function BoxScoreModal({ boxScore, loading, error, onClose, onRetry }) {
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 overflow-y-auto">
       <div className="bg-highlight-dark border border-neutral-700 rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
@@ -439,89 +466,119 @@ function BoxScoreModal({ boxScore, onClose }) {
         </div>
 
         <div className="p-4 space-y-6">
-          {/* Away Team */}
-          <div>
-            <h3 className="text-xl font-bold mb-3 flex items-center gap-2">
-              <span>{boxScore.away_team_name || boxScore.away_team_tricode || 'Away Team'}</span>
-              {boxScore.away_team_tricode && (
-                <span className="text-sm text-neutral-400 font-normal">({boxScore.away_team_tricode})</span>
-              )}
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-neutral-800">
-                  <tr>
-                    <th className="text-left p-2">Player</th>
-                    <th className="p-2">MIN</th>
-                    <th className="p-2">PTS</th>
-                    <th className="p-2">REB</th>
-                    <th className="p-2">AST</th>
-                    <th className="p-2">FG</th>
-                    <th className="p-2">3PT</th>
-                    <th className="p-2">+/-</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {boxScore.away_players.map((player, i) => (
-                    <tr key={i} className="border-b border-neutral-700">
-                      <td className="p-2 font-semibold">{player.name}</td>
-                      <td className="p-2 text-center">{player.minutes}</td>
-                      <td className="p-2 text-center font-bold">{player.points}</td>
-                      <td className="p-2 text-center">{player.rebounds}</td>
-                      <td className="p-2 text-center">{player.assists}</td>
-                      <td className="p-2 text-center text-xs">{player.fg_made}/{player.fg_attempted}</td>
-                      <td className="p-2 text-center text-xs">{player.three_made}/{player.three_attempted}</td>
-                      <td className={`p-2 text-center ${player.plus_minus > 0 ? 'text-green-400' : player.plus_minus < 0 ? 'text-red-400' : ''}`}>
-                        {player.plus_minus > 0 ? '+' : ''}{player.plus_minus}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {/* Loading State */}
+          {loading && (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mb-4"></div>
+              <p className="text-neutral-400 text-lg">Loading box score...</p>
             </div>
-          </div>
+          )}
 
-          {/* Home Team */}
-          <div>
-            <h3 className="text-xl font-bold mb-3 flex items-center gap-2">
-              <span>{boxScore.home_team_name || boxScore.home_team_tricode || 'Home Team'}</span>
-              {boxScore.home_team_tricode && (
-                <span className="text-sm text-neutral-400 font-normal">({boxScore.home_team_tricode})</span>
-              )}
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-neutral-800">
-                  <tr>
-                    <th className="text-left p-2">Player</th>
-                    <th className="p-2">MIN</th>
-                    <th className="p-2">PTS</th>
-                    <th className="p-2">REB</th>
-                    <th className="p-2">AST</th>
-                    <th className="p-2">FG</th>
-                    <th className="p-2">3PT</th>
-                    <th className="p-2">+/-</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {boxScore.home_players.map((player, i) => (
-                    <tr key={i} className="border-b border-neutral-700">
-                      <td className="p-2 font-semibold">{player.name}</td>
-                      <td className="p-2 text-center">{player.minutes}</td>
-                      <td className="p-2 text-center font-bold">{player.points}</td>
-                      <td className="p-2 text-center">{player.rebounds}</td>
-                      <td className="p-2 text-center">{player.assists}</td>
-                      <td className="p-2 text-center text-xs">{player.fg_made}/{player.fg_attempted}</td>
-                      <td className="p-2 text-center text-xs">{player.three_made}/{player.three_attempted}</td>
-                      <td className={`p-2 text-center ${player.plus_minus > 0 ? 'text-green-400' : player.plus_minus < 0 ? 'text-red-400' : ''}`}>
-                        {player.plus_minus > 0 ? '+' : ''}{player.plus_minus}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {/* Error State */}
+          {error && !loading && (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="text-6xl mb-4">⚠️</div>
+              <p className="text-red-400 text-lg mb-4">{error}</p>
+              <button
+                onClick={onRetry}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white px-6 py-3 rounded-xl transition-all font-semibold shadow-lg hover:shadow-xl hover:scale-105 flex items-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Retry
+              </button>
             </div>
-          </div>
+          )}
+
+          {/* Box Score Data */}
+          {boxScore && !loading && !error && (
+            <>
+              {/* Away Team */}
+              <div>
+                <h3 className="text-xl font-bold mb-3 flex items-center gap-2">
+                  <span>{boxScore.away_team_name || boxScore.away_team_tricode || 'Away Team'}</span>
+                  {boxScore.away_team_tricode && (
+                    <span className="text-sm text-neutral-400 font-normal">({boxScore.away_team_tricode})</span>
+                  )}
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-neutral-800">
+                      <tr>
+                        <th className="text-left p-2">Player</th>
+                        <th className="p-2">MIN</th>
+                        <th className="p-2">PTS</th>
+                        <th className="p-2">REB</th>
+                        <th className="p-2">AST</th>
+                        <th className="p-2">FG</th>
+                        <th className="p-2">3PT</th>
+                        <th className="p-2">+/-</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {boxScore.away_players.map((player, i) => (
+                        <tr key={i} className="border-b border-neutral-700">
+                          <td className="p-2 font-semibold">{player.name}</td>
+                          <td className="p-2 text-center">{player.minutes}</td>
+                          <td className="p-2 text-center font-bold">{player.points}</td>
+                          <td className="p-2 text-center">{player.rebounds}</td>
+                          <td className="p-2 text-center">{player.assists}</td>
+                          <td className="p-2 text-center text-xs">{player.fg_made}/{player.fg_attempted}</td>
+                          <td className="p-2 text-center text-xs">{player.three_made}/{player.three_attempted}</td>
+                          <td className={`p-2 text-center ${player.plus_minus > 0 ? 'text-green-400' : player.plus_minus < 0 ? 'text-red-400' : ''}`}>
+                            {player.plus_minus > 0 ? '+' : ''}{player.plus_minus}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Home Team */}
+              <div>
+                <h3 className="text-xl font-bold mb-3 flex items-center gap-2">
+                  <span>{boxScore.home_team_name || boxScore.home_team_tricode || 'Home Team'}</span>
+                  {boxScore.home_team_tricode && (
+                    <span className="text-sm text-neutral-400 font-normal">({boxScore.home_team_tricode})</span>
+                  )}
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-neutral-800">
+                      <tr>
+                        <th className="text-left p-2">Player</th>
+                        <th className="p-2">MIN</th>
+                        <th className="p-2">PTS</th>
+                        <th className="p-2">REB</th>
+                        <th className="p-2">AST</th>
+                        <th className="p-2">FG</th>
+                        <th className="p-2">3PT</th>
+                        <th className="p-2">+/-</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {boxScore.home_players.map((player, i) => (
+                        <tr key={i} className="border-b border-neutral-700">
+                          <td className="p-2 font-semibold">{player.name}</td>
+                          <td className="p-2 text-center">{player.minutes}</td>
+                          <td className="p-2 text-center font-bold">{player.points}</td>
+                          <td className="p-2 text-center">{player.rebounds}</td>
+                          <td className="p-2 text-center">{player.assists}</td>
+                          <td className="p-2 text-center text-xs">{player.fg_made}/{player.fg_attempted}</td>
+                          <td className="p-2 text-center text-xs">{player.three_made}/{player.three_attempted}</td>
+                          <td className={`p-2 text-center ${player.plus_minus > 0 ? 'text-green-400' : player.plus_minus < 0 ? 'text-red-400' : ''}`}>
+                            {player.plus_minus > 0 ? '+' : ''}{player.plus_minus}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
